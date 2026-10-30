@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ระบบข้อมูลลูกค้า
 
-## Getting Started
+Next.js 16 · TypeScript · Prisma 7 + SQLite · Auth.js v5 (credentials) · Tailwind 4
 
-First, run the development server:
+## เริ่มต้นใช้งาน
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install                 # รัน prisma generate ให้อัตโนมัติ
+cp .env.example .env        # แล้วใส่ AUTH_SECRET และ SEED_ADMIN_PASSWORD
+npm run db:migrate          # สร้างฐานข้อมูล prisma/dev.db
+npm run db:seed             # สร้าง admin คนแรก (ถ้ามีอยู่แล้วจะข้าม)
+npm run dev                 # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## โครงสร้างหลัก
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| ไฟล์ | หน้าที่ |
+|---|---|
+| `src/auth.config.ts` | config ที่ไม่แตะ DB ใช้ร่วมกับ proxy |
+| `src/auth.ts` | Credentials provider (ตรวจรหัสผ่านด้วย bcrypt และเช็ค `isActive`) |
+| `src/proxy.ts` | redirect ไป `/login` ถ้ายังไม่ล็อกอิน (เป็นการเช็คเบื้องต้นเท่านั้น) |
+| `src/lib/dal.ts` | `getCurrentUser()` / `requireAdmin()` อ่าน role/tier จาก DB ทุก request |
+| `src/lib/permissions.ts` | ตารางสิทธิ์ tier × ฟีเจอร์ และฟังก์ชัน `can()` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+JWT เก็บแค่ user id ส่วน role, tier และสถานะบัญชีอ่านจาก DB ทุกครั้ง
+admin จึงเปลี่ยน tier หรือปิดบัญชีได้โดยมีผลทันที
 
-## Learn More
+## การทดสอบ
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm test                                          # รันทุกเทสต์ (ประมาณ 2 วินาที)
+node --import tsx --experimental-test-module-mocks --test src/test/import.int.test.ts   # รันเฉพาะไฟล์
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+ไม่ต้องเปิด dev server และไม่แตะ `prisma/dev.db` เทสต์แต่ละไฟล์สร้างฐานข้อมูล SQLite ชั่วคราวใน temp folder
+รัน migration ชุดเดียวกับของจริง แล้วลบทิ้งเมื่อจบ
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| ไฟล์ | ตรวจอะไร |
+|---|---|
+| `src/lib/permissions.test.ts` | ตาราง tier × ฟีเจอร์ตรงตามสเปก และทุก API route / server action มีการตรวจสิทธิ์ |
+| `src/test/api-permissions.int.test.ts` | เรียก API และ server action ตรงๆ ในฐานะผู้ใช้แต่ละ tier: tier 1 ไม่ได้รับข้อมูลการเงินจาก `/api/customers`, `/api/customers/:id` ไม่ว่าจะส่ง query อะไรมา, Export ไม่ได้ (403), แก้ฟิลด์การเงินผ่านฟอร์มไม่ได้; tier 2 เห็นและ Export ได้; ลบได้เฉพาะ tier 3; ยังไม่ล็อกอิน/บัญชีถูกปิด ได้ 401; เปลี่ยน tier แล้วมีผลทันที |
+| `src/test/import.int.test.ts` | นำเข้า Excel ครบขั้นตอน (อัปโหลด → วิเคราะห์ → ยืนยัน): แยกแถวใหม่/ซ้ำ/ผิด, อัปเดตแถวซ้ำ, บันทึกประวัติ, กดยืนยันซ้ำพร้อมกันไม่นำเข้าซ้ำ, tier 1 ส่งคอลัมน์การเงินมาเองก็ไม่ถูกบันทึก, คนอื่นยืนยันชุดนำเข้าของเราไม่ได้ |
+| `src/server/**/*.test.ts` | ฟังก์ชันล้วน: อ่านไฟล์ Excel/CSV, จัดประเภทแถว, diff ประวัติ, ไฟล์ Export, ตรวจเลขภาษี |
 
-## Deploy on Vercel
+เทสต์ `*.int.test.ts` เรียก route handler และ server action ตัวจริงกับฐานข้อมูลจริง
+ส่วนที่จำลองมีแค่ session (`@/auth`) กับ `redirect()`/`forbidden()`/`revalidatePath()` ของ Next.js
+(ดู `src/test/harness.ts`) การอ่าน role/tier จาก DB และการตรวจสิทธิ์ทั้งหมดทำงานตามจริง
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## สำรองและกู้คืนข้อมูล
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ข้อมูลทั้งหมดอยู่ 2 ที่ ต้องสำรองคู่กัน
+
+- `prisma/dev.db` (หรือไฟล์ตาม `DATABASE_URL`): ลูกค้า ผู้ใช้ ประวัติ
+- `storage/imports/` (หรือ `IMPORT_STORAGE_DIR`): ไฟล์ Excel ต้นฉบับที่ผู้ใช้อัปโหลด
+
+### สำรอง
+
+```bash
+npm run db:backup                      # → backups/<วันที่-เวลา>/app.db และ imports/
+npm run db:backup -- /Volumes/USB/bk   # เลือกปลายทางเอง
+```
+
+สั่งได้ขณะแอปเปิดอยู่ สคริปต์ใช้ `VACUUM INTO` ของ SQLite ซึ่งได้สำเนาที่สมบูรณ์ ณ จุดเวลาเดียว
+ส่วนการ `cp` ไฟล์ `.db` ตรงๆ ระหว่างที่มีคนบันทึกข้อมูลอยู่ อาจได้ไฟล์ที่เสีย
+
+ตรวจไฟล์สำรอง: `sqlite3 backups/<วันที่-เวลา>/app.db "pragma integrity_check"` ต้องได้ `ok`
+
+สำรองอัตโนมัติทุกวันตอนตี 2 ด้วย cron (`crontab -e`):
+
+```
+0 2 * * * cd "/path/to/App Account" && npm run db:backup >> backups/backup.log 2>&1
+```
+
+ไฟล์สำรองมีข้อมูลการเงินและรหัสผ่าน (แบบ hash) ของทุกคน ควรเก็บไว้นอกเครื่องในที่ที่จำกัดสิทธิ์
+และลบชุดเก่าเป็นระยะ โฟลเดอร์ `backups/` อยู่ใน `.gitignore` แล้ว
+
+### กู้คืน
+
+```bash
+# 1. หยุดแอปก่อน (Ctrl+C ที่ npm run dev / npm start)
+# 2. เก็บของปัจจุบันไว้เผื่อ แล้ววางไฟล์สำรองทับ
+mv prisma/dev.db prisma/dev.db.before-restore
+rm -f prisma/dev.db-wal prisma/dev.db-shm
+cp backups/<วันที่-เวลา>/app.db prisma/dev.db
+rm -rf storage/imports && cp -R backups/<วันที่-เวลา>/imports storage/imports   # ถ้ามี
+# 3. ถ้าไฟล์สำรองเก่ากว่าโค้ด ให้รัน migration ที่ขาดไป แล้วเปิดแอป
+npx prisma migrate deploy
+npm run dev
+```

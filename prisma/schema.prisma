@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum ImportStatus {
+  PREVIEW
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  displayName  String
+  role         Role      @default(MEMBER)
+  tier         Int       @default(1) // 1 = Basic, 2 = Standard, 3 = Advanced
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdCustomers Customer[]  @relation("CustomerCreatedBy")
+  updatedCustomers Customer[]  @relation("CustomerUpdatedBy")
+  imports          ImportLog[]
+  exports          ExportLog[]
+  auditLogs        AuditLog[]
+}
+
+model Customer {
+  id   String @id @default(cuid())
+  code String @unique // C00001, generated
+
+  // ข้อมูลพื้นฐาน
+  name            String
+  phone           String?
+  phoneNormalized String? // digits only, for search and duplicate checks
+  email           String?
+  address         String?
+  note            String?
+
+  // ข้อมูลภาษี/บริษัท
+  companyName   String?
+  taxId         String? // 13 digits, checksum-validated
+  isHeadOffice  Boolean @default(true)
+  branchCode    String? // "00000" for head office, otherwise 5 digits
+  contactPerson String?
+
+  // ข้อมูลการเงิน — only selected for users with viewFinancial
+  creditLimit        Decimal?
+  paymentTermDays    Int?
+  outstandingBalance Decimal  @default(0)
+
+  createdById String
+  createdBy   User      @relation("CustomerCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("CustomerUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime? // soft delete
+
+  tags      CustomerTag[]
+  auditLogs AuditLog[]
+
+  @@index([deletedAt, name])
+  @@index([phoneNormalized])
+  @@index([taxId, branchCode])
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  color     String        @default("slate")
+  createdAt DateTime      @default(now())
+  customers CustomerTag[]
+}
+
+model CustomerTag {
+  customerId String
+  tagId      String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, tagId])
+  @@index([tagId])
+}
+
+model ImportLog {
+  id         String       @id @default(cuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id])
+  fileName   String
+  fileSize   Int
+  fileStored Boolean      @default(false) // original file kept in storage/imports/<id>
+  status     ImportStatus @default(PREVIEW)
+
+  headers       String // JSON string[]
+  rows          String // JSON string[][] — staged on the server until commit, cleared after
+  columnMapping String? // JSON { [columnIndex]: field }, saved on commit
+
+  totalRows   Int @default(0)
+  createdRows Int @default(0)
+  updatedRows Int @default(0)
+  skippedRows Int @default(0)
+  failedRows  Int @default(0)
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  errors    ImportRowError[]
+  auditLogs AuditLog[]
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model ImportRowError {
+  id        String    @id @default(cuid())
+  batchId   String
+  batch     ImportLog @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  rowNumber Int // as shown in Excel (header = row 1)
+  message   String
+
+  @@index([batchId])
+}
+
+// Every customer export, with the filters that produced it
+model ExportLog {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  fileName          String
+  filters           String // JSON { q, tags: [{ id, name }] } at the time of the export
+  rowCount          Int
+  includesFinancial Boolean // false when the exporter lacked viewFinancial
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+// Who changed which customer, field by field
+model AuditLog {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  action        AuditAction
+  customerId    String
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  customerLabel String // "C00001 ชื่อลูกค้า" at the time of the change
+  changes       String // JSON [{ field, from, to }]
+  importLogId   String? // set when the change came from a spreadsheet import
+  importLog     ImportLog?  @relation(fields: [importLogId], references: [id])
+  createdAt     DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([customerId, createdAt])
+}
