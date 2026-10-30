@@ -12,6 +12,10 @@ const customer: CustomerDTO = {
   email: null,
   address: null,
   note: null,
+  facebook: "Somchai Jaidee",
+  lineId: "somchai.j",
+  workplace: null,
+  workplacePhone: "02-035-1400 ต่อ 409",
   companyName: null,
   taxId: "0105536009604",
   isHeadOffice: true,
@@ -52,4 +56,6 @@ test("keeps leading zeros in phone, tax ID and branch", () => {
   assert.equal(row["เลขประจำตัวผู้เสียภาษี"], "0105536009604");
   assert.equal(row["รหัสสาขา"], "00000");
   assert.equal(row["แท็ก"], "VIP");
+  assert.equal(row["Facebook"], "Somchai Jaidee");
+  assert.equal(row["เบอร์ที่ทำงาน"], "02-035-1400 ต่อ 409");
 });

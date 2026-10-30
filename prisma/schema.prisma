@@ -18,6 +18,11 @@ enum AuditAction {
   DELETE
 }
 
+enum LoanStatus {
+  ACTIVE
+  CLOSED
+}
+
 enum ImportStatus {
   PREVIEW
   COMPLETED
@@ -40,6 +45,7 @@ model User {
   updatedCustomers Customer[]  @relation("CustomerUpdatedBy")
   imports          ImportLog[]
   exports          ExportLog[]
+  loans            Loan[]
   auditLogs        AuditLog[]
 }
 
@@ -54,6 +60,12 @@ model Customer {
   email           String?
   address         String?
   note            String?
+
+  // ช่องทางติดต่อ / ที่ทำงาน
+  facebook       String?
+  lineId         String?
+  workplace      String?
+  workplacePhone String?
 
   // ข้อมูลภาษี/บริษัท
   companyName   String?
@@ -77,6 +89,7 @@ model Customer {
 
   tags      CustomerTag[]
   auditLogs AuditLog[]
+  loans     Loan[]
 
   @@index([deletedAt, name])
   @@index([phoneNormalized])
@@ -138,6 +151,30 @@ model ImportRowError {
   message   String
 
   @@index([batchId])
+}
+
+// A loan to a customer. Interest is simple interest, quoted per year and capped
+// at MAX_INTEREST_RATE_PER_YEAR (src/lib/loan.ts) — enforced on every write.
+model Loan {
+  id                  String     @id @default(cuid())
+  customerId          String
+  customer            Customer   @relation(fields: [customerId], references: [id])
+  principal           Decimal // เงินต้น (บาท)
+  interestRatePerYear Decimal // ร้อยละต่อปี
+  interestDueDay      Int // ส่งดอกทุกวันที่ 1–31 (เดือนที่ไม่มีวันนั้น = วันสุดท้ายของเดือน)
+  startDate           DateTime // วันที่ปล่อยกู้
+  principalDueDate    DateTime? // กำหนดคืนเงินต้น, null = ไม่มีกำหนด
+  status              LoanStatus @default(ACTIVE)
+  note                String?
+  closedAt            DateTime?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status, interestDueDay])
+  @@index([customerId])
 }
 
 // Every customer export, with the filters that produced it

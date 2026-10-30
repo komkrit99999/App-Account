@@ -6,6 +6,10 @@ export const AUDIT_FIELDS = {
   email: { label: "อีเมล" },
   address: { label: "ที่อยู่" },
   note: { label: "หมายเหตุ" },
+  facebook: { label: "Facebook" },
+  lineId: { label: "ID LINE" },
+  workplace: { label: "ที่ทำงาน" },
+  workplacePhone: { label: "เบอร์ที่ทำงาน" },
   companyName: { label: "ชื่อบริษัท" },
   taxId: { label: "เลขประจำตัวผู้เสียภาษี" },
   branch: { label: "สำนักงาน/สาขา" },
@@ -34,6 +38,10 @@ export type SnapshotSource = {
   email: string | null;
   address: string | null;
   note: string | null;
+  facebook: string | null;
+  lineId: string | null;
+  workplace: string | null;
+  workplacePhone: string | null;
   companyName: string | null;
   taxId: string | null;
   isHeadOffice: boolean;
@@ -52,6 +60,10 @@ export function snapshotOf(c: SnapshotSource): Snapshot {
     email: c.email,
     address: c.address,
     note: c.note,
+    facebook: c.facebook,
+    lineId: c.lineId,
+    workplace: c.workplace,
+    workplacePhone: c.workplacePhone,
     companyName: c.companyName,
     taxId: c.taxId,
     branch: c.isHeadOffice ? "สำนักงานใหญ่" : `สาขา ${c.branchCode}`,

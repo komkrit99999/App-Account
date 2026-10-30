@@ -20,7 +20,8 @@ npm run dev                 # http://localhost:3000
 | `src/auth.ts` | Credentials provider (ตรวจรหัสผ่านด้วย bcrypt และเช็ค `isActive`) |
 | `src/proxy.ts` | redirect ไป `/login` ถ้ายังไม่ล็อกอิน (เป็นการเช็คเบื้องต้นเท่านั้น) |
 | `src/lib/dal.ts` | `getCurrentUser()` / `requireAdmin()` อ่าน role/tier จาก DB ทุก request |
-| `src/lib/permissions.ts` | ตารางสิทธิ์ tier × ฟีเจอร์ และฟังก์ชัน `can()` |
+| `src/lib/permissions.ts` | ตารางสิทธิ์ tier × ฟีเจอร์ และฟังก์ชัน `can()` — เพิ่มข้อมูลได้ทุก tier, แก้ไข/ลบได้เฉพาะ role ADMIN |
+| `src/lib/loan.ts` | เพดานดอกเบี้ย `MAX_INTEREST_RATE_PER_YEAR` (15% ต่อปี) และการคำนวณดอกเบี้ยต่อเดือน |
 
 JWT เก็บแค่ user id ส่วน role, tier และสถานะบัญชีอ่านจาก DB ทุกครั้ง
 admin จึงเปลี่ยน tier หรือปิดบัญชีได้โดยมีผลทันที
@@ -38,8 +39,9 @@ node --import tsx --experimental-test-module-mocks --test src/test/import.int.te
 | ไฟล์ | ตรวจอะไร |
 |---|---|
 | `src/lib/permissions.test.ts` | ตาราง tier × ฟีเจอร์ตรงตามสเปก และทุก API route / server action มีการตรวจสิทธิ์ |
-| `src/test/api-permissions.int.test.ts` | เรียก API และ server action ตรงๆ ในฐานะผู้ใช้แต่ละ tier: tier 1 ไม่ได้รับข้อมูลการเงินจาก `/api/customers`, `/api/customers/:id` ไม่ว่าจะส่ง query อะไรมา, Export ไม่ได้ (403), แก้ฟิลด์การเงินผ่านฟอร์มไม่ได้; tier 2 เห็นและ Export ได้; ลบได้เฉพาะ tier 3; ยังไม่ล็อกอิน/บัญชีถูกปิด ได้ 401; เปลี่ยน tier แล้วมีผลทันที |
+| `src/test/api-permissions.int.test.ts` | เรียก API และ server action ตรงๆ ในฐานะผู้ใช้แต่ละ tier: tier 1 ไม่ได้รับข้อมูลการเงินจาก `/api/customers`, `/api/customers/:id` ไม่ว่าจะส่ง query อะไรมา, Export ไม่ได้ (403); tier 2 เห็นและ Export ได้; แก้ไข/ลบลูกค้าได้เฉพาะ admin; ยังไม่ล็อกอิน/บัญชีถูกปิด ได้ 401; เปลี่ยน tier แล้วมีผลทันที |
 | `src/test/import.int.test.ts` | นำเข้า Excel ครบขั้นตอน (อัปโหลด → วิเคราะห์ → ยืนยัน): แยกแถวใหม่/ซ้ำ/ผิด, อัปเดตแถวซ้ำ, บันทึกประวัติ, กดยืนยันซ้ำพร้อมกันไม่นำเข้าซ้ำ, tier 1 ส่งคอลัมน์การเงินมาเองก็ไม่ถูกบันทึก, คนอื่นยืนยันชุดนำเข้าของเราไม่ได้ |
+| `src/test/loans.int.test.ts` | เงินกู้: ทุก tier เพิ่มได้, ดอกเบี้ยเกินร้อยละ 15 ต่อปีบันทึกไม่ได้ (รวมถึง admin), tier 1 เห็นเฉพาะที่ตัวเองบันทึก, แก้ไข/ปิดยอดได้เฉพาะ admin |
 | `src/server/**/*.test.ts` | ฟังก์ชันล้วน: อ่านไฟล์ Excel/CSV, จัดประเภทแถว, diff ประวัติ, ไฟล์ Export, ตรวจเลขภาษี |
 
 เทสต์ `*.int.test.ts` เรียก route handler และ server action ตัวจริงกับฐานข้อมูลจริง

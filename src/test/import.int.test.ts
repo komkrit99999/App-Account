@@ -134,6 +134,20 @@ describe("tier 2: analyze and commit", () => {
     assert.equal(await h.db.customer.count(), 1);
   });
 
+  test("asking to update duplicates is ignored for non-admins: they are skipped", async () => {
+    const id = await upload();
+    await expectRedirect(actions.commitImport(id, autoMapping(true), { duplicateDefault: "update", overrides: { 1: "update" } }));
+    const existing = await h.db.customer.findUniqueOrThrow({ where: { id: existingId } });
+    assert.equal(existing.name, "สยามเทรดดิ้ง");
+    assert.equal(existing.creditLimit?.toFixed(2), "1000.00");
+    const log = await h.db.importLog.findUniqueOrThrow({ where: { id } });
+    assert.deepEqual([log.createdRows, log.updatedRows, log.skippedRows], [1, 0, 1]);
+  });
+});
+
+describe("admin: analyze and commit with updates", () => {
+  before(() => h.loginAs(users.admin));
+
   test("commit creates, updates, records errors, and writes audit history", async () => {
     const id = await upload();
     const url = await expectRedirect(actions.commitImport(id, autoMapping(true), { duplicateDefault: "update", overrides: {} }));
@@ -143,7 +157,7 @@ describe("tier 2: analyze and commit", () => {
     assert.equal(created.code, "C00002");
     assert.equal(created.creditLimit?.toFixed(2), "15000.00");
     assert.equal(created.phoneNormalized, "0899999999");
-    assert.equal(created.createdById, users.tier2.id);
+    assert.equal(created.createdById, users.admin.id);
 
     const updated = await h.db.customer.findUniqueOrThrow({ where: { id: existingId } });
     assert.equal(updated.name, "สยามเทรดดิ้ง (ชื่อใหม่)");
@@ -161,7 +175,7 @@ describe("tier 2: analyze and commit", () => {
 
     const audit = await h.db.auditLog.findMany({ where: { importLogId: id }, orderBy: { action: "asc" } });
     assert.deepEqual(audit.map((a) => a.action), ["CREATE", "UPDATE"]);
-    assert.ok(audit.every((a) => a.userId === users.tier2.id));
+    assert.ok(audit.every((a) => a.userId === users.admin.id));
   });
 
   test("duplicates are skipped by default, per-row override can update", async () => {
@@ -225,12 +239,22 @@ describe("tier 1: financial columns are never imported", () => {
 
     const created = await h.db.customer.findFirstOrThrow({ where: { name: "ร้านใหม่ หนึ่ง" } });
     assert.equal(created.creditLimit, null);
-    const updated = await h.db.customer.findUniqueOrThrow({ where: { id: existingId } });
-    assert.equal(updated.name, "สยามเทรดดิ้ง (ชื่อใหม่)", "non-financial fields still update");
-    assert.equal(updated.creditLimit?.toFixed(2), "1000.00", "financial value untouched");
+    const existing = await h.db.customer.findUniqueOrThrow({ where: { id: existingId } });
+    assert.equal(existing.name, "สยามเทรดดิ้ง", "tier 1 can't update existing customers");
+    assert.equal(existing.creditLimit?.toFixed(2), "1000.00");
 
     const log = await h.db.importLog.findUniqueOrThrow({ where: { id } });
     assert.ok(!Object.values(JSON.parse(log.columnMapping ?? "{}")).includes("creditLimit"));
+  });
+
+  test("admin on tier 1: updates existing customers, but still not financial columns", async () => {
+    h.loginAs(users.adminTier1);
+    const id = await upload();
+    await expectRedirect(actions.commitImport(id, FULL_MAPPING, { duplicateDefault: "update", overrides: {} }));
+    const updated = await h.db.customer.findUniqueOrThrow({ where: { id: existingId } });
+    assert.equal(updated.name, "สยามเทรดดิ้ง (ชื่อใหม่)");
+    assert.equal(updated.creditLimit?.toFixed(2), "1000.00", "financial value untouched");
+    h.loginAs(users.tier1);
   });
 });
 

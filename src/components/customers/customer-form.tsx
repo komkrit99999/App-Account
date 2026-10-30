@@ -63,6 +63,13 @@ export function CustomerForm({ action, initial, tags, submitLabel, cancelHref }:
         </div>
       </Section>
 
+      <Section title="ช่องทางติดต่อ / ที่ทำงาน">
+        {field("facebook", "Facebook")}
+        {field("lineId", "ID LINE")}
+        {field("workplace", "ที่ทำงาน")}
+        {field("workplacePhone", "เบอร์ที่ทำงาน", { type: "tel", placeholder: "02-035-1400 ต่อ 409" })}
+      </Section>
+
       <Section title="ข้อมูลภาษี / บริษัท">
         {field("companyName", "ชื่อบริษัท")}
         {field("contactPerson", "ผู้ติดต่อ")}

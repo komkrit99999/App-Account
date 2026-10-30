@@ -8,14 +8,16 @@ import { FEATURES, can, featuresOf, type Feature } from "./permissions";
 const EXPECTED: Record<Feature, { t1: boolean; t2: boolean; t3: boolean; admin: boolean }> = {
   viewCustomers:       { t1: true,  t2: true,  t3: true,  admin: false },
   createCustomer:      { t1: true,  t2: true,  t3: true,  admin: false },
-  editCustomer:        { t1: true,  t2: true,  t3: true,  admin: false },
+  createLoan:          { t1: true,  t2: true,  t3: true,  admin: false },
+  editCustomer:        { t1: false, t2: false, t3: false, admin: true },
+  editLoan:            { t1: false, t2: false, t3: false, admin: true },
   importExcel:         { t1: true,  t2: true,  t3: true,  admin: false },
   viewFinancial:       { t1: false, t2: true,  t3: true,  admin: false },
   editFinancial:       { t1: false, t2: true,  t3: true,  admin: false },
   exportExcel:         { t1: false, t2: true,  t3: true,  admin: false },
   viewOwnHistory:      { t1: true,  t2: true,  t3: true,  admin: false },
-  deleteCustomer:      { t1: false, t2: false, t3: true,  admin: false },
-  bulkDeleteCustomers: { t1: false, t2: false, t3: true,  admin: false },
+  deleteCustomer:      { t1: false, t2: false, t3: false, admin: true },
+  bulkDeleteCustomers: { t1: false, t2: false, t3: false, admin: true },
   viewAllHistory:      { t1: false, t2: false, t3: true,  admin: true },
   manageTags:          { t1: false, t2: false, t3: true,  admin: false },
   manageUsers:         { t1: false, t2: false, t3: false, admin: true },
@@ -41,6 +43,10 @@ test("admin role adds admin features on top of its tier", () => {
   assert.equal(can(admin1, "viewCustomers"), true);
   assert.equal(can(admin1, "viewFinancial"), false); // still tier 1 for customer data
   assert.equal(can({ role: "ADMIN", tier: 3 }, "deleteCustomer"), true);
+  // Editing/removing existing records is admin-only, whatever the tier
+  assert.equal(can(member(3), "editCustomer"), false);
+  assert.equal(can(member(3), "deleteCustomer"), false);
+  assert.equal(can(member(3), "editLoan"), false);
 });
 
 test("fails closed for missing users and unknown tiers", () => {

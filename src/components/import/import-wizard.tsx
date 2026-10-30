@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { buttonPrimary, buttonSecondary, cardClass } from "@/components/ui";
+import { useCan } from "@/components/permissions-provider";
 import { IMPORT_FIELDS, type ColumnMapping, type ImportField } from "@/lib/import-fields";
 import { analyzeImport, cancelImport, commitImport, type ReviewRow } from "@/server/import/actions";
 
@@ -37,6 +38,8 @@ export function ImportWizard(props: Props) {
   const [overrides, setOverrides] = useState<Record<number, Choice>>({});
   const [tab, setTab] = useState<Tab>("all");
   const [pending, startTransition] = useTransition();
+  // Only admins may overwrite existing customers; for everyone else duplicates are always skipped
+  const canUpdate = useCan("editCustomer");
 
   const usedFields = Object.values(mapping);
   const nameMapped = usedFields.includes("name");
@@ -202,7 +205,13 @@ export function ImportWizard(props: Props) {
           <Stat label="ผิดพลาด (ไม่นำเข้า)" value={counts.invalid} className="text-red-700" />
         </div>
 
-        {counts.duplicate > 0 && (
+        {counts.duplicate > 0 && !canUpdate && (
+          <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            ข้อมูลซ้ำ {counts.duplicate} แถวจะถูกข้าม ไม่แก้ข้อมูลลูกค้าเดิม (เฉพาะ admin ที่อัปเดตข้อมูลเดิมได้)
+          </p>
+        )}
+
+        {counts.duplicate > 0 && canUpdate && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-amber-50 px-4 py-3 text-sm">
             <span className="font-medium text-amber-900">ข้อมูลซ้ำ {counts.duplicate} แถว ค่าเริ่มต้น:</span>
             {(["skip", "update"] as const).map((c) => (
@@ -276,7 +285,7 @@ export function ImportWizard(props: Props) {
                         <span className="text-slate-600">
                           ซ้ำกับ {r.match.code} {r.match.name} ({r.match.by === "taxId" ? "เลขภาษี" : "เบอร์โทร"})
                         </span>
-                        <select
+                        {canUpdate && <select
                           value={overrides[r.index] ?? duplicateDefault}
                           onChange={(e) => setOverrides((o) => ({ ...o, [r.index]: e.target.value as Choice }))}
                           aria-label={`การจัดการแถว ${r.rowNumber}`}
@@ -284,7 +293,7 @@ export function ImportWizard(props: Props) {
                         >
                           <option value="skip">ข้าม</option>
                           <option value="update">อัปเดตทับ</option>
-                        </select>
+                        </select>}
                       </div>
                     )}
                   </td>

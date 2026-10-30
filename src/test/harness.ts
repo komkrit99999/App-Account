@@ -82,12 +82,13 @@ async function seedUsers(db: PrismaClient) {
   const make = (username: string, tier: number, role: "ADMIN" | "MEMBER" = "MEMBER", isActive = true) =>
     db.user.create({
       data: { username, passwordHash: "-", displayName: username, tier, role, isActive },
-      select: { id: true, username: true },
+      select: { id: true, username: true, role: true, tier: true },
     });
   return {
     tier1: await make("tier1", 1),
     tier2: await make("tier2", 2),
     tier3: await make("tier3", 3),
+    admin: await make("admin", 3, "ADMIN"),
     adminTier1: await make("admin-t1", 1, "ADMIN"),
     inactiveTier3: await make("inactive-t3", 3, "MEMBER", false),
   };

@@ -16,7 +16,7 @@ export const IMPORT_FIELDS = {
     required: true,
     hint: "จำเป็นต้องกรอก",
     example: "บริษัท ตัวอย่าง จำกัด",
-    aliases: ["ชื่อ", "ชื่อลูกค้า", "ลูกค้า", "name", "customer", "customer name"],
+    aliases: ["ชื่อ", "ชื่อลูกค้า", "ลูกค้า", "ชื่อผู้กู้", "ผู้กู้", "name", "customer", "customer name"],
   },
   phone: {
     label: "เบอร์โทร",
@@ -37,6 +37,30 @@ export const IMPORT_FIELDS = {
     aliases: ["ที่อยู่", "address"],
   },
   note: { label: "หมายเหตุ", hint: "", example: "", aliases: ["หมายเหตุ", "note", "notes", "remark", "remarks"] },
+  facebook: {
+    label: "Facebook",
+    hint: "ชื่อหรือลิงก์โปรไฟล์",
+    example: "Somchai Jaidee",
+    aliases: ["facebook", "เฟซบุ๊ก", "เฟสบุ๊ค", "เฟส", "fb"],
+  },
+  lineId: {
+    label: "ID LINE",
+    hint: "",
+    example: "somchai.j",
+    aliases: ["id line", "line id", "ไอดีไลน์", "ไลน์", "line"],
+  },
+  workplace: {
+    label: "ที่ทำงาน",
+    hint: "",
+    example: "ร้านสมชายการค้า",
+    aliases: ["ที่ทำงาน", "สถานที่ทำงาน", "workplace", "work place", "employer"],
+  },
+  workplacePhone: {
+    label: "เบอร์ที่ทำงาน",
+    hint: "ใส่เบอร์ต่อได้ เช่น 02-035-1400 ต่อ 409",
+    example: "02-035-1400",
+    aliases: ["เบอร์ที่ทำงาน", "โทรศัพท์ที่ทำงาน", "work phone", "office phone"],
+  },
   companyName: {
     label: "ชื่อบริษัท",
     hint: "",

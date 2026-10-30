@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { requireFeature } from "@/lib/authz";
 import { can } from "@/lib/permissions";
 import { formatTaxId } from "@/lib/thai-tax-id";
-import { formatDateTime, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
+import { dueDayLabel, monthlyInterest } from "@/lib/loan";
+import { listLoansForCustomer } from "@/server/loans/queries";
+import { LoanStatusButton } from "@/components/loans/loan-status-button";
 import { getCustomer } from "@/server/customers/queries";
 import { listAuditLogs } from "@/server/history/queries";
 import { AuditEntry } from "@/components/history/audit-entry";
@@ -53,6 +56,13 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         <Item label="หมายเหตุ" wide>{c.note}</Item>
       </Section>
 
+      <Section title="ช่องทางติดต่อ / ที่ทำงาน">
+        <Item label="Facebook">{c.facebook}</Item>
+        <Item label="ID LINE">{c.lineId}</Item>
+        <Item label="ที่ทำงาน">{c.workplace}</Item>
+        <Item label="เบอร์ที่ทำงาน">{c.workplacePhone}</Item>
+      </Section>
+
       <Section title="ข้อมูลภาษี / บริษัท">
         <Item label="ชื่อบริษัท">{c.companyName}</Item>
         <Item label="ผู้ติดต่อ">{c.contactPerson}</Item>
@@ -70,6 +80,8 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         </Section>
       )}
 
+      {can(user, "createLoan") && <CustomerLoans user={user} customerId={c.id} />}
+
       {can(user, "viewOwnHistory") && <CustomerHistory user={user} customerId={c.id} />}
 
       <p className="text-xs text-slate-500">
@@ -77,6 +89,52 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         {c.updatedBy && ` · แก้ไขล่าสุดโดย ${c.updatedBy} เมื่อ ${formatDateTime(c.updatedAt)}`}
       </p>
     </div>
+  );
+}
+
+async function CustomerLoans({ user, customerId }: { user: Awaited<ReturnType<typeof requireFeature>>; customerId: string }) {
+  const loans = await listLoansForCustomer(user, customerId);
+  const canCreate = can(user, "createLoan");
+  const canEdit = can(user, "editLoan");
+  return (
+    <section className={cardClass}>
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <h2 className="text-sm font-semibold text-slate-700">
+          เงินกู้{!can(user, "viewFinancial") && " (เฉพาะที่คุณบันทึก)"}
+        </h2>
+        {canCreate && (
+          <Link href={`/loans/new?customer=${customerId}`} className="text-sm text-blue-700 hover:underline">
+            + เพิ่มเงินกู้
+          </Link>
+        )}
+      </div>
+      <ul className="divide-y divide-slate-100 text-sm">
+        {loans.map((l) => (
+          <li key={l.id} className={`flex flex-wrap items-center justify-between gap-2 px-5 py-3 ${l.status === "CLOSED" ? "text-slate-400" : ""}`}>
+            <div>
+              <span className="font-medium tabular-nums">{formatMoney(l.principal)} บาท</span>
+              <span className="ml-2">
+                ร้อยละ {Number(l.interestRatePerYear)} ต่อปี = {formatMoney(String(monthlyInterest(l.principal, l.interestRatePerYear)))} บาท/เดือน
+              </span>
+              <div className="text-xs text-slate-500">
+                ส่งดอกทุก{dueDayLabel(l.interestDueDay)} · ปล่อยกู้ {formatDate(l.startDate)} · คืนต้น{" "}
+                {l.principalDueDate ? formatDate(l.principalDueDate) : "ไม่มีกำหนด"}
+                {l.status === "CLOSED" && l.closedAt && ` · ปิดยอด ${formatDate(l.closedAt)}`}
+              </div>
+            </div>
+            {canEdit && (
+              <div className="whitespace-nowrap">
+                <Link href={`/loans/${l.id}/edit`} className="mr-3 text-blue-700 hover:underline">
+                  แก้ไข
+                </Link>
+                <LoanStatusButton id={l.id} status={l.status} />
+              </div>
+            )}
+          </li>
+        ))}
+        {loans.length === 0 && <li className="px-5 py-6 text-center text-slate-500">ยังไม่มีเงินกู้</li>}
+      </ul>
+    </section>
   );
 }
 

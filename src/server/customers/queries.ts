@@ -12,6 +12,10 @@ const baseSelect = {
   email: true,
   address: true,
   note: true,
+  facebook: true,
+  lineId: true,
+  workplace: true,
+  workplacePhone: true,
   companyName: true,
   taxId: true,
   isHeadOffice: true,
@@ -52,6 +56,10 @@ export type CustomerDTO = {
   email: string | null;
   address: string | null;
   note: string | null;
+  facebook: string | null;
+  lineId: string | null;
+  workplace: string | null;
+  workplacePhone: string | null;
   companyName: string | null;
   taxId: string | null;
   isHeadOffice: boolean;
@@ -81,6 +89,10 @@ function toDTO(row: Row, user: PermissionSubject): CustomerDTO {
     email: row.email,
     address: row.address,
     note: row.note,
+    facebook: row.facebook,
+    lineId: row.lineId,
+    workplace: row.workplace,
+    workplacePhone: row.workplacePhone,
     companyName: row.companyName,
     taxId: row.taxId,
     isHeadOffice: row.isHeadOffice,
@@ -119,6 +131,9 @@ function customerWhere(params: Pick<CustomerListParams, "q" | "tagIds">): Prisma
       { contactPerson: { contains: q } },
       { email: { contains: q } },
       { code: { contains: q } },
+      { facebook: { contains: q } },
+      { lineId: { contains: q } },
+      { workplace: { contains: q } },
     ];
     if (digits.length >= 3) {
       or.push({ phoneNormalized: { contains: digits } }, { taxId: { contains: q.replace(/\D/g, "") } });

@@ -4,22 +4,24 @@
 // must check again.
 
 export const FEATURES = {
-  // Tier 1
+  // Tier 1 — every tier can add records
   viewCustomers: "ดูข้อมูลลูกค้า",
   createCustomer: "เพิ่มลูกค้า",
-  editCustomer: "แก้ไขลูกค้า",
-  importExcel: "นำเข้า Excel/CSV",
+  createLoan: "เพิ่มเงินกู้ (เห็นเฉพาะที่ตัวเองบันทึก ถ้าไม่มีสิทธิ์ดูข้อมูลการเงิน)",
+  importExcel: "นำเข้า Excel/CSV (เพิ่มลูกค้าใหม่เท่านั้น)",
   viewOwnHistory: "ดูประวัติของตัวเอง",
   // Tier 2
   viewFinancial: "ดูข้อมูลการเงิน",
-  editFinancial: "แก้ไขข้อมูลการเงิน",
+  editFinancial: "กรอกข้อมูลการเงินของลูกค้า",
   exportExcel: "Export เป็น Excel",
   // Tier 3
-  deleteCustomer: "ลบลูกค้า",
-  bulkDeleteCustomers: "ลบหลายรายการพร้อมกัน",
   viewAllHistory: "ดูประวัติของทุกคน",
   manageTags: "จัดการแท็ก",
-  // Admin role (independent of tier)
+  // Admin role (independent of tier) — only admins change or remove existing records
+  editCustomer: "แก้ไขลูกค้า (รวมถึงอัปเดตลูกค้าเดิมตอนนำเข้า)",
+  deleteCustomer: "ลบลูกค้า",
+  bulkDeleteCustomers: "ลบหลายรายการพร้อมกัน",
+  editLoan: "แก้ไข / ปิดยอด / เปิดสัญญาเงินกู้อีกครั้ง",
   manageUsers: "จัดการผู้ใช้และ tier",
 } as const;
 
@@ -32,9 +34,9 @@ export const TIER_LABELS: Record<number, string> = {
   3: "Tier 3 · Advanced",
 };
 
-const TIER_1 = ["viewCustomers", "createCustomer", "editCustomer", "importExcel", "viewOwnHistory"] as const;
+const TIER_1 = ["viewCustomers", "createCustomer", "createLoan", "importExcel", "viewOwnHistory"] as const;
 const TIER_2 = [...TIER_1, "viewFinancial", "editFinancial", "exportExcel"] as const;
-const TIER_3 = [...TIER_2, "deleteCustomer", "bulkDeleteCustomers", "viewAllHistory", "manageTags"] as const;
+const TIER_3 = [...TIER_2, "viewAllHistory", "manageTags"] as const;
 
 export const TIER_FEATURES: Record<Tier, readonly Feature[]> = {
   1: TIER_1,
@@ -43,7 +45,14 @@ export const TIER_FEATURES: Record<Tier, readonly Feature[]> = {
 };
 
 // Granted on top of the user's tier features
-export const ADMIN_FEATURES: readonly Feature[] = ["manageUsers", "viewAllHistory"];
+export const ADMIN_FEATURES: readonly Feature[] = [
+  "editCustomer",
+  "deleteCustomer",
+  "bulkDeleteCustomers",
+  "editLoan",
+  "manageUsers",
+  "viewAllHistory",
+];
 
 export type PermissionSubject = { role: string; tier: number };
 

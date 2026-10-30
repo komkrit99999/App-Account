@@ -22,6 +22,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               ระบบข้อมูลลูกค้า
             </Link>
             {can(user, "viewCustomers") && <NavLink href="/customers">ลูกค้า</NavLink>}
+            {can(user, "createLoan") && <NavLink href="/loans">เงินกู้</NavLink>}
             {can(user, "importExcel") && <NavLink href="/import">นำเข้า</NavLink>}
             {can(user, "manageTags") && <NavLink href="/tags">แท็ก</NavLink>}
             {can(user, "viewOwnHistory") && <NavLink href="/history">ประวัติ</NavLink>}

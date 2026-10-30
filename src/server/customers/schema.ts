@@ -27,6 +27,11 @@ export const basicSchema = z
     email: text(200).refine((v) => v === null || z.email().safeParse(v).success, "รูปแบบอีเมลไม่ถูกต้อง"),
     address: text(500),
     note: text(2000),
+    facebook: text(200),
+    lineId: text(100),
+    workplace: text(200),
+    // Free text: office numbers often carry extensions ("02-035-1400 ต่อ 409")
+    workplacePhone: text(100),
     companyName: text(200),
     contactPerson: text(200),
     taxId: z
@@ -100,6 +105,10 @@ export function parseCustomerInput(
     email: str("email"),
     address: str("address"),
     note: str("note"),
+    facebook: str("facebook"),
+    lineId: str("lineId"),
+    workplace: str("workplace"),
+    workplacePhone: str("workplacePhone"),
     companyName: str("companyName"),
     contactPerson: str("contactPerson"),
     taxId: str("taxId"),

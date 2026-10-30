@@ -159,7 +159,9 @@ export async function commitImport(batchId: string, rawMapping: unknown, rawDeci
   const { duplicateDefault, overrides } = decisions.data;
   const toCreate = result.rows.filter((r) => r.status === "new");
   const duplicates = result.rows.filter((r) => r.status === "duplicate");
-  const toUpdate = duplicates.filter((r) => (overrides[r.index] ?? duplicateDefault) === "update");
+  // Updating an existing customer is an edit: admins only. Everyone else's duplicates are skipped.
+  const canUpdate = can(user, "editCustomer");
+  const toUpdate = canUpdate ? duplicates.filter((r) => (overrides[r.index] ?? duplicateDefault) === "update") : [];
   const failed = result.rows.filter((r) => r.status === "invalid");
   const now = new Date();
 

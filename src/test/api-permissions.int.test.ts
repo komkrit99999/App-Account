@@ -152,7 +152,36 @@ describe("tier 1 cannot get financial data through the API", () => {
     for (const label of FINANCIAL_LABELS) assert.ok(!headers.includes(label), label);
   });
 
-  test("updateCustomer: financial form fields are ignored", async () => {
+  test("updateCustomer: forbidden (admin only)", async () => {
+    const form = new FormData();
+    form.set("name", "เปลี่ยนชื่อ");
+    form.set("branchType", "head");
+    await assert.rejects(actions.updateCustomer(customerId, {}, form), ForbiddenError);
+    assert.equal((await h.db.customer.findUniqueOrThrow({ where: { id: customerId } })).name, "บริษัท ทดสอบสิทธิ์ จำกัด");
+  });
+
+  test("createCustomer: allowed, financial fields ignored", async () => {
+    const form = new FormData();
+    form.set("name", "ลูกค้าจาก tier 1");
+    form.set("branchType", "head");
+    form.set("creditLimit", "5000");
+    const url = await expectRedirect(actions.createCustomer({}, form));
+    const c = await h.db.customer.findUniqueOrThrow({ where: { id: url.split("/").pop() } });
+    assert.equal(c.createdById, users.tier1.id);
+    assert.equal(c.creditLimit, null);
+  });
+
+  test("deleteCustomer: forbidden (admin only)", async () => {
+    await assert.rejects(actions.deleteCustomer(customerId), ForbiddenError);
+    const c = await h.db.customer.findUniqueOrThrow({ where: { id: customerId } });
+    assert.equal(c.deletedAt, null);
+  });
+});
+
+describe("admin on tier 1: may edit, but financial fields still follow the tier", () => {
+  before(() => h.loginAs(users.adminTier1));
+
+  test("updateCustomer: allowed, financial form fields are ignored", async () => {
     const form = new FormData();
     form.set("name", "บริษัท ทดสอบสิทธิ์ จำกัด");
     form.set("phone", "081-111-2222");
@@ -167,12 +196,7 @@ describe("tier 1 cannot get financial data through the API", () => {
     assert.equal(c.creditLimit?.toFixed(2), CREDIT);
     assert.equal(c.paymentTermDays, TERM);
     assert.equal(c.outstandingBalance.toFixed(2), BALANCE);
-  });
-
-  test("deleteCustomer: forbidden (tier 3 only)", async () => {
-    await assert.rejects(actions.deleteCustomer(customerId), ForbiddenError);
-    const c = await h.db.customer.findUniqueOrThrow({ where: { id: customerId } });
-    assert.equal(c.deletedAt, null);
+    assert.equal(c.updatedById, users.adminTier1.id);
   });
 });
 
@@ -205,13 +229,30 @@ describe("tier 2", () => {
     for (const label of FINANCIAL_LABELS) assert.ok(headers.includes(label), label);
   });
 
-  test("deleteCustomer: still forbidden", async () => {
+  test("updateCustomer and deleteCustomer: forbidden (admin only)", async () => {
+    const form = new FormData();
+    form.set("name", "x");
+    form.set("branchType", "head");
+    await assert.rejects(actions.updateCustomer(customerId, {}, form), ForbiddenError);
     await assert.rejects(actions.deleteCustomer(customerId), ForbiddenError);
   });
 });
 
-describe("tier 3", () => {
+describe("tier 3 member", () => {
   before(() => h.loginAs(users.tier3));
+
+  test("updateCustomer and deleteCustomer: still forbidden — tier 3 is not admin", async () => {
+    const form = new FormData();
+    form.set("name", "x");
+    form.set("branchType", "head");
+    await assert.rejects(actions.updateCustomer(customerId, {}, form), ForbiddenError);
+    await assert.rejects(actions.deleteCustomer(customerId), ForbiddenError);
+    assert.equal((await h.db.customer.findUniqueOrThrow({ where: { id: customerId } })).deletedAt, null);
+  });
+});
+
+describe("admin", () => {
+  before(() => h.loginAs(users.admin));
 
   test("deleteCustomer: allowed (soft delete + audit log)", async () => {
     const extra = await h.db.customer.create({ data: { code: "C00099", name: "ลบได้", createdById: users.tier3.id } });

@@ -4,7 +4,7 @@ import { can } from "@/lib/permissions";
 import { IMPORT_FIELDS, importFieldsFor, type ImportField } from "@/lib/import-fields";
 
 // Columns that must stay text so Excel doesn't strip leading zeros
-const TEXT_FIELDS: ImportField[] = ["phone", "taxId", "branch"];
+const TEXT_FIELDS: ImportField[] = ["phone", "workplacePhone", "taxId", "branch"];
 
 const SECOND_EXAMPLE: Partial<Record<ImportField, string>> = {
   name: "ร้านสมชายการค้า",
