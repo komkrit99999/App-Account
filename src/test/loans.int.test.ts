@@ -2,7 +2,7 @@
 // which loans. Through the real server actions and queries.
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { ForbiddenError, expectRedirect, setupIntegration, type TestUsers } from "./harness";
+import { ForbiddenError, NotFoundError, expectRedirect, setupIntegration, type TestUsers } from "./harness";
 
 let h: Awaited<ReturnType<typeof setupIntegration>>;
 let users: TestUsers;
@@ -20,6 +20,7 @@ function loanForm(overrides: Record<string, string> = {}) {
 }
 
 before(async () => {
+  process.env.FEATURE_LOANS = "1";
   h = await setupIntegration();
   users = h.users;
   actions = await import("@/server/loans/actions");
@@ -141,5 +142,26 @@ describe("only admins edit, close and reopen", () => {
     row = await h.db.loan.findUniqueOrThrow({ where: { id: tier2LoanId } });
     assert.equal(row.status, "ACTIVE");
     assert.equal(row.closedAt, null);
+  });
+});
+
+describe("switched off (FEATURE_LOANS unset)", () => {
+  before(() => {
+    delete process.env.FEATURE_LOANS;
+    h.loginAs(users.admin);
+  });
+  after(() => {
+    process.env.FEATURE_LOANS = "1";
+  });
+
+  test("every loan server action answers 404 and changes nothing", async () => {
+    const count = await h.db.loan.count();
+    await assert.rejects(actions.createLoan({}, loanForm()), NotFoundError);
+    await assert.rejects(actions.updateLoan(tier2LoanId, {}, loanForm({ principal: "1" })), NotFoundError);
+    await assert.rejects(actions.setLoanStatus(tier2LoanId, "CLOSED"), NotFoundError);
+    assert.equal(await h.db.loan.count(), count);
+    const row = await h.db.loan.findUniqueOrThrow({ where: { id: tier2LoanId } });
+    assert.equal(row.status, "ACTIVE");
+    assert.notEqual(row.principal.toFixed(2), "1.00");
   });
 });

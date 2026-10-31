@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { notFound } from "next/navigation";
 import { requireFeature } from "@/lib/authz";
+import { loansEnabled } from "@/lib/features";
 import { can } from "@/lib/permissions";
 import { formatDate, formatMoney, toDateInput, todayDateInput } from "@/lib/format";
 import { MAX_INTEREST_RATE_PER_YEAR, dueDayLabel, isInterestDueOn, monthlyInterest } from "@/lib/loan";
@@ -16,6 +18,9 @@ const STATUS_TABS: [LoanStatusFilter, string][] = [
 
 // Laid out like the paper/Excel ledger: one row per loan, ordered by interest due day
 export default async function LoansPage({ searchParams }: PageProps<"/loans">) {
+  // Checked in each page, not a layout: layouts and pages render in parallel,
+  // so a layout's notFound() would not stop this page from streaming its data
+  if (!loansEnabled()) notFound();
   // Everyone who can add loans sees this page; without viewFinancial only their own entries
   const user = await requireFeature("createLoan");
   const sp = await searchParams;

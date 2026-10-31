@@ -1,10 +1,15 @@
+import { notFound } from "next/navigation";
 import { requireFeature } from "@/lib/authz";
+import { loansEnabled } from "@/lib/features";
 import { todayDateInput } from "@/lib/format";
 import { createLoan } from "@/server/loans/actions";
 import { listBorrowerOptions } from "@/server/loans/queries";
 import { LoanForm } from "@/components/loans/loan-form";
 
 export default async function NewLoanPage({ searchParams }: PageProps<"/loans/new">) {
+  // Checked in each page, not a layout: layouts and pages render in parallel,
+  // so a layout's notFound() would not stop this page from streaming its data
+  if (!loansEnabled()) notFound();
   await requireFeature("createLoan");
   const sp = await searchParams;
   const customerId = typeof sp.customer === "string" ? sp.customer : "";

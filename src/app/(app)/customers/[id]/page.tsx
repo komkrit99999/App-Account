@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { requireFeature } from "@/lib/authz";
 import { can } from "@/lib/permissions";
+import { loansEnabled } from "@/lib/features";
 import { formatTaxId } from "@/lib/thai-tax-id";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { dueDayLabel, monthlyInterest } from "@/lib/loan";
@@ -80,7 +81,7 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         </Section>
       )}
 
-      {can(user, "createLoan") && <CustomerLoans user={user} customerId={c.id} />}
+      {loansEnabled() && can(user, "createLoan") && <CustomerLoans user={user} customerId={c.id} />}
 
       {can(user, "viewOwnHistory") && <CustomerHistory user={user} customerId={c.id} />}
 

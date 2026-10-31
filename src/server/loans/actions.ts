@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { forbidden } from "next/navigation";
+import { forbidden, notFound } from "next/navigation";
+import { loansEnabled } from "@/lib/features";
 import { requireFeature } from "@/lib/authz";
 import { can } from "@/lib/permissions";
 import { loanFormValues, parseLoanForm, type LoanFieldErrors, type LoanFormValues } from "./schema";
@@ -18,7 +19,13 @@ async function validate(formData: FormData) {
   return parsed;
 }
 
+/** Server actions stay callable by URL, so they check the switch themselves */
+function requireLoansEnabled() {
+  if (!loansEnabled()) notFound();
+}
+
 export async function createLoan(_prev: LoanFormState, formData: FormData): Promise<LoanFormState> {
+  requireLoansEnabled();
   const user = await requireFeature("createLoan");
   const result = await validate(formData);
   if (!result.ok) return { errors: result.errors, values: loanFormValues(formData) };
@@ -30,6 +37,7 @@ export async function createLoan(_prev: LoanFormState, formData: FormData): Prom
 
 /** Admins only, and they must also be able to see the amounts they are changing */
 async function requireLoanEditor() {
+  requireLoansEnabled();
   const user = await requireFeature("editLoan");
   if (!can(user, "viewFinancial")) forbidden();
   return user;

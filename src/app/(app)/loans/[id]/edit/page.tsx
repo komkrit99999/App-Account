@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
 import { requireFeature } from "@/lib/authz";
+import { loansEnabled } from "@/lib/features";
 import { toDateInput } from "@/lib/format";
 import { updateLoan } from "@/server/loans/actions";
 import { getLoan } from "@/server/loans/queries";
 import { LoanForm } from "@/components/loans/loan-form";
 
 export default async function EditLoanPage({ params }: PageProps<"/loans/[id]/edit">) {
+  // Checked in each page, not a layout: layouts and pages render in parallel,
+  // so a layout's notFound() would not stop this page from streaming its data
+  if (!loansEnabled()) notFound();
   const user = await requireFeature("editLoan");
   const { id } = await params;
   const loan = await getLoan(user, id);
