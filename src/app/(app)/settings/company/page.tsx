@@ -30,7 +30,6 @@ export default async function CompanySettingsPage() {
           branchType: c.isHeadOffice ? "head" : "branch",
           branchCode: c.branchCode ?? "",
           headerNote: c.headerNote ?? "",
-          invoicePrefix: c.invoicePrefix,
           vatRate: c.vatRate,
         }}
       />

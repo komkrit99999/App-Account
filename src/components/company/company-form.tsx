@@ -4,6 +4,7 @@ import { useActionState, useState, type ReactNode } from "react";
 import { buttonPrimary, cardClass, inputClass } from "@/components/ui";
 import type { CompanyFormState } from "@/server/company/actions";
 
+
 export function CompanyForm({ action, initial, hasLogo }: { action: (prev: CompanyFormState, fd: FormData) => Promise<CompanyFormState>; initial: Record<string, string>; hasLogo: boolean }) {
   const [state, formAction, pending] = useActionState(action, {});
   const values = state.values ?? initial;
@@ -79,7 +80,6 @@ export function CompanyForm({ action, initial, hasLogo }: { action: (prev: Compa
       </Section>
 
       <Section title="ใบกำกับภาษี">
-        {field("invoicePrefix", "อักษรนำหน้าเลขที่", { required: true, placeholder: "INV", hint: "เช่น INV → INV-102026/00001" })}
         {field("vatRate", "อัตราภาษีมูลค่าเพิ่ม (%)", { required: true, hint: "ใช้กับใบที่ออกหลังจากนี้ ใบเดิมคงอัตราเดิม" })}
       </Section>
 

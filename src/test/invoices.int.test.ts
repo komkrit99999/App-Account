@@ -19,9 +19,13 @@ const PAPER_ITEMS = [
   { description: "Xiaomi wifi Router Pro 4 AC2600", quantity: "12", unit: "ตัว", unitPrice: "2,498.00", discount: "" },
 ];
 
+// Each form gets a fresh number unless the test sets one
+let numberCounter = 0;
+
 function invoiceForm(overrides: Record<string, string> = {}, items: unknown = PAPER_ITEMS) {
   const fd = new FormData();
   const values = {
+    number: `T-${String(++numberCounter).padStart(4, "0")}`,
     customerId,
     buyerName: "บริษัท ผู้ซื้อทดสอบ จำกัด",
     buyerBranch: "สำนักงานใหญ่",
@@ -56,7 +60,6 @@ function companyForm(overrides: Record<string, string> = {}, logo?: File) {
     branchType: "head",
     branchCode: "",
     headerNote: "เอกสารออกเป็นชุด",
-    invoicePrefix: "TS",
     vatRate: "7",
     ...overrides,
   };
@@ -102,11 +105,10 @@ describe("company settings", () => {
     assert.equal(await h.db.companySettings.count(), 0);
   });
 
-  test("validates tax ID, prefix, VAT rate and logo type", async () => {
+  test("validates tax ID, VAT rate and logo type", async () => {
     h.loginAs(users.admin);
-    const r = await company.saveCompany({}, companyForm({ taxId: "1234567890123", invoicePrefix: "TS/1", vatRate: "abc" }, new File(["not an image"], "logo.png")));
+    const r = await company.saveCompany({}, companyForm({ taxId: "1234567890123", vatRate: "abc" }, new File(["not an image"], "logo.png")));
     assert.ok(r.errors?.taxId);
-    assert.ok(r.errors?.invoicePrefix);
     assert.ok(r.errors?.vatRate);
     assert.match(r.errors?.logo ?? "", /PNG, JPG หรือ WebP/);
     assert.equal(await h.db.companySettings.count(), 0);
@@ -134,11 +136,11 @@ describe("company settings", () => {
 describe("issuing", () => {
   let firstId: string;
 
-  test("tier 1 issues an invoice; totals are computed on the server", async () => {
-    firstId = await createAs(users.tier1);
+  test("tier 1 issues an invoice with the number they typed; totals are computed on the server", async () => {
+    firstId = await createAs(users.tier1, { number: " IN0926-0070 " });
     const inv = await queries.getInvoice(users.tier1, firstId);
     assert.ok(inv);
-    assert.equal(inv.number, "TS-092026/00001");
+    assert.equal(inv.number, "IN0926-0070");
     assert.equal(inv.subtotal, "111060.00");
     assert.equal(inv.vatRate, "7");
     assert.equal(inv.vatAmount, "7774.20");
@@ -168,13 +170,26 @@ describe("issuing", () => {
     assert.ok(none.errors?.items);
   });
 
-  test("numbers are consecutive and unique, even for simultaneous submits", async () => {
+  test("the number is required and can't repeat", async () => {
+    h.loginAs(users.tier2);
+    assert.ok((await actions.createInvoice({}, invoiceForm({ number: "  " }))).errors?.number);
+    const r = await actions.createInvoice({}, invoiceForm({ number: "IN0926-0070" }));
+    assert.match(r.errors?.number ?? "", /มีอยู่แล้ว/);
+    assert.equal(await h.db.invoice.count({ where: { number: "IN0926-0070" } }), 1);
+  });
+
+  test("simultaneous submits: different numbers all succeed, the same number only once", async () => {
     h.loginAs(users.tier2);
     const before = await h.db.invoice.count();
     const results = await Promise.allSettled(Array.from({ length: 5 }, () => actions.createInvoice({}, invoiceForm())));
     assert.ok(results.every((r) => r.status === "rejected" && /redirect/.test(String(r.reason))), "all five succeed");
     const seqs = (await h.db.invoice.findMany({ orderBy: { seq: "asc" }, select: { seq: true } })).map((r) => r.seq);
     assert.deepEqual(seqs, Array.from({ length: before + 5 }, (_, i) => i + 1));
+
+    const same = await Promise.allSettled([0, 1].map(() => actions.createInvoice({}, invoiceForm({ number: "SAME-1" }))));
+    assert.equal(same.filter((r) => r.status === "rejected" && /redirect/.test(String(r.reason))).length, 1);
+    assert.equal(same.filter((r) => r.status === "fulfilled" && /มีอยู่แล้ว/.test(r.value.errors?.number ?? "")).length, 1);
+    assert.equal(await h.db.invoice.count({ where: { number: "SAME-1" } }), 1);
   });
 
   test("issued invoices keep the buyer and seller as they were", async () => {
@@ -200,7 +215,7 @@ describe("issuing", () => {
 describe("editing and cancelling: admins only", () => {
   let id: string;
   before(async () => {
-    id = (await h.db.invoice.findFirstOrThrow({ where: { seq: 1 } })).id;
+    id = (await h.db.invoice.findFirstOrThrow({ where: { number: "IN0926-0070" } })).id;
   });
 
   test("non-admins (and admin on tier 1) are forbidden", async () => {
@@ -214,14 +229,24 @@ describe("editing and cancelling: admins only", () => {
     assert.equal(row.status, "ISSUED");
   });
 
-  test("admin edits details and items; totals recomputed with the original VAT rate, number unchanged", async () => {
+  test("admin edits the number, details and items; totals recomputed with the original VAT rate", async () => {
     h.loginAs(users.admin);
+    // Changing to a number another invoice uses is refused
+    const clash = await actions.updateInvoice(id, {}, invoiceForm({ number: "SAME-1" }));
+    assert.match(clash.errors?.number ?? "", /มีอยู่แล้ว/);
+    // Keeping its own number is fine
+    await expectRedirect(actions.updateInvoice(id, {}, invoiceForm({ number: "IN0926-0070" })));
+
     const url = await expectRedirect(
-      actions.updateInvoice(id, {}, invoiceForm({ buyerName: "ชื่อที่แก้แล้ว", remark: "แก้ไขรายการ" }, [{ description: "สินค้าใหม่", quantity: "2", unit: "ชิ้น", unitPrice: "1000", discount: "100" }])),
+      actions.updateInvoice(
+        id,
+        {},
+        invoiceForm({ number: "IN0926-0071", buyerName: "ชื่อที่แก้แล้ว", remark: "แก้ไขรายการ" }, [{ description: "สินค้าใหม่", quantity: "2", unit: "ชิ้น", unitPrice: "1000", discount: "100" }]),
+      ),
     );
     assert.equal(url, `/invoices/${id}`);
     const inv = await queries.getInvoice(users.admin, id);
-    assert.equal(inv?.number, "TS-092026/00001");
+    assert.equal(inv?.number, "IN0926-0071");
     assert.equal(inv?.buyerName, "ชื่อที่แก้แล้ว");
     assert.equal(inv?.items.length, 1);
     assert.equal(inv?.subtotal, "1900.00");
@@ -240,9 +265,8 @@ describe("editing and cancelling: admins only", () => {
     const r = await actions.updateInvoice(id, {}, invoiceForm());
     assert.match(r.errors?.form ?? "", /ยกเลิกแล้ว/);
 
-    // The next invoice does not reuse the cancelled number
-    const maxBefore = (await h.db.invoice.aggregate({ _max: { seq: true } }))._max.seq!;
-    const next = await createAs(users.admin);
-    assert.equal((await h.db.invoice.findUniqueOrThrow({ where: { id: next } })).seq, maxBefore + 1);
+    // Its number can't be given to a new invoice
+    const reuse = await actions.createInvoice({}, invoiceForm({ number: "IN0926-0071" }));
+    assert.match(reuse.errors?.number ?? "", /ยกเลิกแล้ว/);
   });
 });

@@ -42,6 +42,7 @@ const itemSchema = z.object({
 
 export const invoiceSchema = z
   .object({
+    number: z.string().trim().min(1, "กรอกเลขที่ใบกำกับ").max(40, "ยาวเกิน 40 ตัวอักษร"),
     customerId: z.string().min(1, "เลือกลูกค้า"),
     buyerName: z.string().trim().min(1, "กรอกชื่อลูกค้า").max(200, "ยาวเกิน 200 ตัวอักษร"),
     buyerBranch: text(50),
@@ -84,7 +85,7 @@ export type InvoiceFormValues = {
   items: { description: string; quantity: string; unit: string; unitPrice: string; discount: string }[];
 };
 
-const HEADER_FIELDS = ["customerId", "buyerName", "buyerBranch", "buyerAddress", "buyerTaxId", "issueDate", "dueDate", "salesperson", "paymentTerm", "remark"] as const;
+const HEADER_FIELDS = ["number", "customerId", "buyerName", "buyerBranch", "buyerAddress", "buyerTaxId", "issueDate", "dueDate", "salesperson", "paymentTerm", "remark"] as const;
 
 export function invoiceFormValues(formData: FormData): InvoiceFormValues {
   let items: InvoiceFormValues["items"] = [];

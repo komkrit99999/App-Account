@@ -5,7 +5,7 @@ import { toDateInput } from "@/lib/format";
 import { formatTaxId } from "@/lib/thai-tax-id";
 import { updateInvoice } from "@/server/invoices/actions";
 import { listBuyerOptions } from "@/server/invoices/buyers";
-import { getInvoice } from "@/server/invoices/queries";
+import { getInvoice, lastInvoiceNumber } from "@/server/invoices/queries";
 import { MAX_ITEMS } from "@/server/invoices/schema";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
 
@@ -13,7 +13,7 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
   const user = await requireFeature("editInvoice");
   if (!can(user, "viewFinancial")) forbidden();
   const { id } = await params;
-  const [invoice, buyers] = await Promise.all([getInvoice(user, id), listBuyerOptions()]);
+  const [invoice, buyers, lastNumber] = await Promise.all([getInvoice(user, id), listBuyerOptions(), lastInvoiceNumber(id)]);
   if (!invoice || invoice.status === "CANCELLED") notFound();
 
   return (
@@ -21,11 +21,12 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
       <h1 className="text-2xl font-semibold">
         แก้ไขใบกำกับภาษี <span className="text-slate-400">{invoice.number}</span>
       </h1>
-      <p className="text-sm text-slate-500">เลขที่เอกสาร อัตรา VAT และข้อมูลผู้ขายคงเดิมตามวันที่ออก</p>
+      <p className="text-sm text-slate-500">อัตรา VAT และข้อมูลผู้ขายคงเดิมตามวันที่ออก</p>
       <InvoiceForm
         action={updateInvoice.bind(null, invoice.id)}
         initial={{
           fields: {
+            number: invoice.number,
             customerId: invoice.customerId,
             buyerName: invoice.buyerName,
             buyerBranch: invoice.buyerBranch ?? "",
@@ -46,6 +47,7 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
           })),
         }}
         buyers={buyers}
+        lastNumber={lastNumber}
         vatRate={invoice.vatRate}
         maxItems={MAX_ITEMS}
         submitLabel="บันทึกการแก้ไข"

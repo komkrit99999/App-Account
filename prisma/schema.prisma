@@ -187,23 +187,22 @@ model Loan {
 
 // The seller shown on tax invoices. Single row (id = 1), edited by admins.
 model CompanySettings {
-  id            Int      @id @default(1)
-  nameTh        String   @default("")
-  nameEn        String?
-  addressTh     String?
-  addressEn     String?
-  phone         String?
-  email         String?
-  lineId        String?
-  facebook      String?
-  taxId         String?
-  isHeadOffice  Boolean  @default(true)
-  branchCode    String? // 5 digits when not head office
-  headerNote    String? // small line under the tax ID, e.g. "เอกสารออกเป็นชุด"
-  invoicePrefix String   @default("INV")
-  vatRate       Decimal  @default(7) // percent
-  logoMime      String? // set when a logo is stored in storage/company/logo
-  updatedAt     DateTime @updatedAt
+  id           Int      @id @default(1)
+  nameTh       String   @default("")
+  nameEn       String?
+  addressTh    String?
+  addressEn    String?
+  phone        String?
+  email        String?
+  lineId       String?
+  facebook     String?
+  taxId        String?
+  isHeadOffice Boolean  @default(true)
+  branchCode   String? // 5 digits when not head office
+  headerNote   String? // small line under the tax ID, e.g. "เอกสารออกเป็นชุด"
+  vatRate      Decimal  @default(7) // percent
+  logoMime     String? // set when a logo is stored in storage/company/logo
+  updatedAt    DateTime @updatedAt
 }
 
 // Tax invoice (ใบกำกับภาษี). Never deleted — cancelled instead, so numbers stay continuous.
@@ -211,8 +210,8 @@ model CompanySettings {
 // customer or company don't change an issued document.
 model Invoice {
   id          String        @id @default(cuid())
-  seq         Int           @unique // running number
-  number      String        @unique // e.g. INV-102026/00001
+  seq         Int           @unique // order of issue (internal)
+  number      String        @unique // typed in by the user, e.g. IN1026-0001; editable, never repeated
   status      InvoiceStatus @default(ISSUED)
   issueDate   DateTime // date only (UTC midnight)
   dueDate     DateTime?

@@ -95,11 +95,3 @@ export function bahtText(amount: string): string {
   const bahtPart = baht > 0n ? `${readNumber(baht)}บาท` : "";
   return st === 0n ? `${bahtPart}ถ้วน` : `${bahtPart}${readGroup(Number(st), false)}สตางค์`;
 }
-
-// ---------- numbering ----------
-
-/** INV-102026/00001: prefix, month and Christian year of the issue date, running number */
-export function formatInvoiceNumber(prefix: string, issueDate: Date, seq: number): string {
-  const mm = String(issueDate.getUTCMonth() + 1).padStart(2, "0");
-  return `${prefix}-${mm}${issueDate.getUTCFullYear()}/${String(seq).padStart(5, "0")}`;
-}

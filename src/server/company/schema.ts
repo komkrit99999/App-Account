@@ -29,10 +29,6 @@ export const companySchema = z
     branchType: z.enum(["head", "branch"]),
     branchCode: z.string().trim(),
     headerNote: text(100),
-    invoicePrefix: z
-      .string()
-      .trim()
-      .regex(/^[A-Za-z0-9]{1,10}$/, "ใช้ตัวอักษรอังกฤษหรือตัวเลข 1–10 ตัว"),
     vatRate: z
       .string()
       .trim()
@@ -54,4 +50,4 @@ export const companySchema = z
 
 export type CompanyInput = z.output<typeof companySchema>;
 
-export const COMPANY_FIELDS = ["nameTh", "nameEn", "addressTh", "addressEn", "phone", "email", "lineId", "facebook", "taxId", "branchType", "branchCode", "headerNote", "invoicePrefix", "vatRate"] as const;
+export const COMPANY_FIELDS = ["nameTh", "nameEn", "addressTh", "addressEn", "phone", "email", "lineId", "facebook", "taxId", "branchType", "branchCode", "headerNote", "vatRate"] as const;

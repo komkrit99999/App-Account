@@ -15,7 +15,7 @@ function visibility(user: Viewer): Prisma.InvoiceWhereInput | null {
   return null;
 }
 
-export type SellerSnapshot = Omit<CompanyDTO, "invoicePrefix" | "vatRate" | "hasLogo">;
+export type SellerSnapshot = Omit<CompanyDTO, "vatRate" | "hasLogo">;
 
 export const INVOICE_PAGE_SIZE = 30;
 
@@ -99,6 +99,16 @@ export async function getInvoice(user: Viewer, id: string) {
       amount: i.amount.toFixed(2),
     })),
   };
+}
+
+/** The most recently issued number, shown as a hint when typing the next one */
+export async function lastInvoiceNumber(exceptId?: string): Promise<string | null> {
+  const row = await db.invoice.findFirst({
+    where: exceptId ? { id: { not: exceptId } } : {},
+    orderBy: { seq: "desc" },
+    select: { number: true },
+  });
+  return row?.number ?? null;
 }
 
 export type InvoiceDTO = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;

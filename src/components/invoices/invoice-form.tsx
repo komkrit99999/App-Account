@@ -26,6 +26,8 @@ type Props = {
   action: (prev: InvoiceFormState, formData: FormData) => Promise<InvoiceFormState>;
   initial: InvoiceFormValues;
   buyers: BuyerOption[];
+  /** Most recent number in use, as a hint for typing the next one */
+  lastNumber: string | null;
   vatRate: string;
   maxItems: number;
   submitLabel: string;
@@ -47,7 +49,7 @@ function buyerFields(b: BuyerOption) {
   };
 }
 
-export function InvoiceForm({ action, initial, buyers, vatRate, maxItems, submitLabel, cancelHref }: Props) {
+export function InvoiceForm({ action, initial, buyers, lastNumber, vatRate, maxItems, submitLabel, cancelHref }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
@@ -61,6 +63,7 @@ export function InvoiceForm({ action, initial, buyers, vatRate, maxItems, submit
       values={values}
       errors={errors}
       buyers={buyers}
+      lastNumber={lastNumber}
       vatRate={vatRate}
       maxItems={maxItems}
       submitLabel={submitLabel}
@@ -75,6 +78,7 @@ function InvoiceFormBody({
   values,
   errors,
   buyers,
+  lastNumber,
   vatRate,
   maxItems,
   submitLabel,
@@ -161,6 +165,15 @@ function InvoiceFormBody({
 
         <fieldset className={`${cardClass} grid gap-4 p-5`}>
           <legend className="px-1 text-sm font-semibold text-slate-700">เอกสาร</legend>
+          <Field
+            label="เลขที่ใบกำกับ"
+            htmlFor="number"
+            error={errors.number}
+            hint={lastNumber ? `เลขที่ล่าสุดที่ใช้ไป: ${lastNumber}` : "ยังไม่เคยออกใบกำกับ"}
+            required
+          >
+            {input("number", { placeholder: "IN1026-0001" })}
+          </Field>
           <Field label="วันที่" htmlFor="issueDate" error={errors.issueDate} required>
             {input("issueDate", { type: "date" })}
           </Field>

@@ -14,7 +14,6 @@ export type CompanyDTO = {
   isHeadOffice: boolean;
   branchCode: string | null;
   headerNote: string | null;
-  invoicePrefix: string;
   vatRate: string;
   hasLogo: boolean;
 };
@@ -39,7 +38,6 @@ export async function getCompany(): Promise<CompanyDTO> {
     isHeadOffice: true,
     branchCode: null,
     headerNote: null,
-    invoicePrefix: "INV",
   };
   void id;
   void updatedAt;

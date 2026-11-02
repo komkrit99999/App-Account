@@ -5,6 +5,7 @@ import { todayDateInput } from "@/lib/format";
 import { formatTaxId } from "@/lib/thai-tax-id";
 import { createInvoice } from "@/server/invoices/actions";
 import { listBuyerOptions } from "@/server/invoices/buyers";
+import { lastInvoiceNumber } from "@/server/invoices/queries";
 import { MAX_ITEMS } from "@/server/invoices/schema";
 import { getCompany, isCompanyReady } from "@/server/company/queries";
 import { InvoiceForm } from "@/components/invoices/invoice-form";
@@ -13,7 +14,7 @@ import { cardClass } from "@/components/ui";
 export default async function NewInvoicePage({ searchParams }: PageProps<"/invoices/new">) {
   const user = await requireFeature("createInvoice");
   const sp = await searchParams;
-  const [company, buyers] = await Promise.all([getCompany(), listBuyerOptions()]);
+  const [company, buyers, lastNumber] = await Promise.all([getCompany(), listBuyerOptions(), lastInvoiceNumber()]);
 
   if (!isCompanyReady(company)) {
     return (
@@ -39,6 +40,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps<"/invoi
         action={createInvoice}
         initial={{
           fields: {
+            number: "",
             customerId: pre?.id ?? "",
             buyerName: pre ? pre.companyName || pre.name : "",
             buyerBranch: pre?.taxId ? (pre.isHeadOffice ? "สำนักงานใหญ่" : `สาขา ${pre.branchCode}`) : "",
@@ -53,6 +55,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps<"/invoi
           items: [],
         }}
         buyers={buyers}
+        lastNumber={lastNumber}
         vatRate={company.vatRate}
         maxItems={MAX_ITEMS}
         submitLabel="ออกใบกำกับภาษี"

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { bahtText, computeTotals, formatInvoiceNumber, toHundredths } from "./invoice";
+import { bahtText, computeTotals, toHundredths } from "./invoice";
 
 test("totals match the paper invoice (VAT 7% added on top)", () => {
   const t = computeTotals(
@@ -51,8 +51,4 @@ test("bahtText", () => {
     ["7774.20", "เจ็ดพันเจ็ดร้อยเจ็ดสิบสี่บาทยี่สิบสตางค์"],
   ];
   for (const [n, words] of cases) assert.equal(bahtText(n), words, n);
-});
-
-test("invoice number: prefix, MMYYYY of the issue date, 5-digit running number", () => {
-  assert.equal(formatInvoiceNumber("ST", new Date("2026-09-17T00:00:00Z"), 70), "ST-092026/00070");
 });
