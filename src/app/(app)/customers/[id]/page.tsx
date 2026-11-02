@@ -8,6 +8,7 @@ import { formatTaxId } from "@/lib/thai-tax-id";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { dueDayLabel, monthlyInterest } from "@/lib/loan";
 import { listLoansForCustomer } from "@/server/loans/queries";
+import { listInvoicesForCustomer } from "@/server/invoices/queries";
 import { LoanStatusButton } from "@/components/loans/loan-status-button";
 import { getCustomer } from "@/server/customers/queries";
 import { listAuditLogs } from "@/server/history/queries";
@@ -81,6 +82,8 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         </Section>
       )}
 
+      {can(user, "createInvoice") && <CustomerInvoices user={user} customerId={c.id} />}
+
       {loansEnabled() && can(user, "createLoan") && <CustomerLoans user={user} customerId={c.id} />}
 
       {can(user, "viewOwnHistory") && <CustomerHistory user={user} customerId={c.id} />}
@@ -90,6 +93,34 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
         {c.updatedBy && ` · แก้ไขล่าสุดโดย ${c.updatedBy} เมื่อ ${formatDateTime(c.updatedAt)}`}
       </p>
     </div>
+  );
+}
+
+async function CustomerInvoices({ user, customerId }: { user: Awaited<ReturnType<typeof requireFeature>>; customerId: string }) {
+  const invoices = await listInvoicesForCustomer(user, customerId);
+  return (
+    <section className={cardClass}>
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
+        <h2 className="text-sm font-semibold text-slate-700">
+          ใบกำกับภาษี{!can(user, "viewFinancial") && " (เฉพาะที่คุณออก)"}
+        </h2>
+        <Link href={`/invoices/new?customer=${customerId}`} className="text-sm text-blue-700 hover:underline">
+          + ออกใบกำกับภาษี
+        </Link>
+      </div>
+      <ul className="divide-y divide-slate-100 text-sm">
+        {invoices.map((inv) => (
+          <li key={inv.id} className={`flex items-center justify-between gap-3 px-5 py-2.5 ${inv.status === "CANCELLED" ? "text-slate-400" : ""}`}>
+            <Link href={`/invoices/${inv.id}`} className="font-medium text-blue-700 hover:underline">
+              {inv.number}
+            </Link>
+            <span className="text-slate-500">{formatDate(inv.issueDate)}</span>
+            <span className={`tabular-nums ${inv.status === "CANCELLED" ? "line-through" : ""}`}>{formatMoney(inv.total)} บาท</span>
+          </li>
+        ))}
+        {invoices.length === 0 && <li className="px-5 py-6 text-center text-slate-500">ยังไม่มีใบกำกับภาษี</li>}
+      </ul>
+    </section>
   );
 }
 

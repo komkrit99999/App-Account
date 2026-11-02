@@ -16,17 +16,19 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="border-b border-slate-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <nav className="flex items-center gap-1 text-sm">
             <Link href="/" className="mr-3 font-semibold">
               ระบบข้อมูลลูกค้า
             </Link>
             {can(user, "viewCustomers") && <NavLink href="/customers">ลูกค้า</NavLink>}
+            {can(user, "createInvoice") && <NavLink href="/invoices">ใบกำกับภาษี</NavLink>}
             {loansEnabled() && can(user, "createLoan") && <NavLink href="/loans">เงินกู้</NavLink>}
             {can(user, "importExcel") && <NavLink href="/import">นำเข้า</NavLink>}
             {can(user, "manageTags") && <NavLink href="/tags">แท็ก</NavLink>}
             {can(user, "viewOwnHistory") && <NavLink href="/history">ประวัติ</NavLink>}
+            {can(user, "manageCompany") && <NavLink href="/settings/company">ตั้งค่าบริษัท</NavLink>}
           </nav>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden text-slate-600 sm:inline">
@@ -44,7 +46,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 print:max-w-none print:p-0">
         <PermissionsProvider features={featuresOf(user)}>{children}</PermissionsProvider>
       </main>
     </div>

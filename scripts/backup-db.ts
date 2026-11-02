@@ -28,10 +28,14 @@ async function main() {
   }
   console.log(`ฐานข้อมูล → ${dbOut} (${(statSync(dbOut).size / 1024).toFixed(0)} KB)`);
 
-  const imports = process.env.IMPORT_STORAGE_DIR ?? path.join("storage", "imports");
-  if (existsSync(imports)) {
-    cpSync(imports, path.join(outDir, "imports"), { recursive: true });
-    console.log(`ไฟล์นำเข้าต้นฉบับ → ${path.join(outDir, "imports")}`);
+  const folders: [string, string, string][] = [
+    [process.env.IMPORT_STORAGE_DIR ?? path.join("storage", "imports"), "imports", "ไฟล์นำเข้าต้นฉบับ"],
+    [process.env.COMPANY_STORAGE_DIR ?? path.join("storage", "company"), "company", "โลโก้บริษัท"],
+  ];
+  for (const [src, name, label] of folders) {
+    if (!existsSync(src)) continue;
+    cpSync(src, path.join(outDir, name), { recursive: true });
+    console.log(`${label} → ${path.join(outDir, name)}`);
   }
 }
 

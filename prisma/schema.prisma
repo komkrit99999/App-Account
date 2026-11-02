@@ -23,6 +23,11 @@ enum LoanStatus {
   CLOSED
 }
 
+enum InvoiceStatus {
+  ISSUED
+  CANCELLED
+}
+
 enum ImportStatus {
   PREVIEW
   COMPLETED
@@ -46,6 +51,8 @@ model User {
   imports          ImportLog[]
   exports          ExportLog[]
   loans            Loan[]
+  invoicesCreated  Invoice[]   @relation("InvoiceCreatedBy")
+  invoicesUpdated  Invoice[]   @relation("InvoiceUpdatedBy")
   auditLogs        AuditLog[]
 }
 
@@ -90,6 +97,7 @@ model Customer {
   tags      CustomerTag[]
   auditLogs AuditLog[]
   loans     Loan[]
+  invoices  Invoice[]
 
   @@index([deletedAt, name])
   @@index([phoneNormalized])
@@ -175,6 +183,85 @@ model Loan {
 
   @@index([status, interestDueDay])
   @@index([customerId])
+}
+
+// The seller shown on tax invoices. Single row (id = 1), edited by admins.
+model CompanySettings {
+  id            Int      @id @default(1)
+  nameTh        String   @default("")
+  nameEn        String?
+  addressTh     String?
+  addressEn     String?
+  phone         String?
+  email         String?
+  lineId        String?
+  facebook      String?
+  taxId         String?
+  isHeadOffice  Boolean  @default(true)
+  branchCode    String? // 5 digits when not head office
+  headerNote    String? // small line under the tax ID, e.g. "เอกสารออกเป็นชุด"
+  invoicePrefix String   @default("INV")
+  vatRate       Decimal  @default(7) // percent
+  logoMime      String? // set when a logo is stored in storage/company/logo
+  updatedAt     DateTime @updatedAt
+}
+
+// Tax invoice (ใบกำกับภาษี). Never deleted — cancelled instead, so numbers stay continuous.
+// Buyer and seller details are copied in at issue time so later edits to the
+// customer or company don't change an issued document.
+model Invoice {
+  id          String        @id @default(cuid())
+  seq         Int           @unique // running number
+  number      String        @unique // e.g. INV-102026/00001
+  status      InvoiceStatus @default(ISSUED)
+  issueDate   DateTime // date only (UTC midnight)
+  dueDate     DateTime?
+  salesperson String?
+  paymentTerm String?
+  remark      String?
+
+  customerId   String
+  customer     Customer @relation(fields: [customerId], references: [id])
+  buyerName    String
+  buyerBranch  String? // "สำนักงานใหญ่" / "สาขา 00001", shown after the name
+  buyerAddress String?
+  buyerTaxId   String?
+
+  seller String // JSON snapshot of CompanySettings
+
+  subtotal  Decimal
+  vatRate   Decimal
+  vatAmount Decimal
+  total     Decimal
+
+  items InvoiceItem[]
+
+  createdById String
+  createdBy   User      @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?     @relation("InvoiceUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  @@index([issueDate])
+  @@index([customerId])
+  @@index([createdById, issueDate])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  position    Int
+  description String
+  quantity    Decimal
+  unit        String?
+  unitPrice   Decimal
+  discount    Decimal @default(0)
+  amount      Decimal
+
+  @@index([invoiceId, position])
 }
 
 // Every customer export, with the filters that produced it

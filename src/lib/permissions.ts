@@ -8,6 +8,7 @@ export const FEATURES = {
   viewCustomers: "ดูข้อมูลลูกค้า",
   createCustomer: "เพิ่มลูกค้า",
   createLoan: "เพิ่มเงินกู้ (เห็นเฉพาะที่ตัวเองบันทึก ถ้าไม่มีสิทธิ์ดูข้อมูลการเงิน)",
+  createInvoice: "ออกใบกำกับภาษี (เห็นเฉพาะที่ตัวเองออก ถ้าไม่มีสิทธิ์ดูข้อมูลการเงิน)",
   importExcel: "นำเข้า Excel/CSV (เพิ่มลูกค้าใหม่เท่านั้น)",
   viewOwnHistory: "ดูประวัติของตัวเอง",
   // Tier 2
@@ -22,6 +23,8 @@ export const FEATURES = {
   deleteCustomer: "ลบลูกค้า",
   bulkDeleteCustomers: "ลบหลายรายการพร้อมกัน",
   editLoan: "แก้ไข / ปิดยอด / เปิดสัญญาเงินกู้อีกครั้ง",
+  editInvoice: "แก้ไข / ยกเลิกใบกำกับภาษี",
+  manageCompany: "ตั้งค่าข้อมูลบริษัท (ผู้ขายบนใบกำกับภาษี)",
   manageUsers: "จัดการผู้ใช้และ tier",
 } as const;
 
@@ -34,7 +37,7 @@ export const TIER_LABELS: Record<number, string> = {
   3: "Tier 3 · Advanced",
 };
 
-const TIER_1 = ["viewCustomers", "createCustomer", "createLoan", "importExcel", "viewOwnHistory"] as const;
+const TIER_1 = ["viewCustomers", "createCustomer", "createLoan", "createInvoice", "importExcel", "viewOwnHistory"] as const;
 const TIER_2 = [...TIER_1, "viewFinancial", "editFinancial", "exportExcel"] as const;
 const TIER_3 = [...TIER_2, "viewAllHistory", "manageTags"] as const;
 
@@ -50,6 +53,8 @@ export const ADMIN_FEATURES: readonly Feature[] = [
   "deleteCustomer",
   "bulkDeleteCustomers",
   "editLoan",
+  "editInvoice",
+  "manageCompany",
   "manageUsers",
   "viewAllHistory",
 ];
