@@ -5,7 +5,15 @@ import { buttonPrimary, cardClass, inputClass } from "@/components/ui";
 import type { CompanyFormState } from "@/server/company/actions";
 
 
-export function CompanyForm({ action, initial, hasLogo }: { action: (prev: CompanyFormState, fd: FormData) => Promise<CompanyFormState>; initial: Record<string, string>; hasLogo: boolean }) {
+type Props = {
+  action: (prev: CompanyFormState, fd: FormData) => Promise<CompanyFormState>;
+  initial: Record<string, string>;
+  /** Current logo, or null when there is none */
+  logoUrl: string | null;
+  submitLabel: string;
+};
+
+export function CompanyForm({ action, initial, logoUrl, submitLabel }: Props) {
   const [state, formAction, pending] = useActionState(action, {});
   const values = state.values ?? initial;
   const errors = state.errors ?? {};
@@ -29,6 +37,7 @@ export function CompanyForm({ action, initial, hasLogo }: { action: (prev: Compa
   return (
     <form action={formAction} key={JSON.stringify(state.values ?? null)} className="space-y-6" noValidate>
       {state.saved && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">บันทึกแล้ว</p>}
+      {errors.form && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errors.form}</p>}
 
       <Section title="ชื่อและที่อยู่ (แสดงบนหัวใบกำกับภาษี)">
         {field("nameTh", "ชื่อบริษัท (ไทย)", { required: true, placeholder: "บริษัท ตัวอย่าง จำกัด" })}
@@ -60,15 +69,16 @@ export function CompanyForm({ action, initial, hasLogo }: { action: (prev: Compa
         {field("phone", "โทรศัพท์")}
         {field("email", "อีเมล")}
         {field("lineId", "ID LINE")}
+        {field("lineOfficial", "LINE Official", { placeholder: "@yourshop" })}
         {field("facebook", "Facebook")}
       </Section>
 
-      <Section title="โลโก้">
+      <Section title="โลโก้" id="logo">
         <div className="space-y-2 sm:col-span-2">
-          {hasLogo && (
+          {logoUrl && (
             <div className="flex items-center gap-4">
               {/* eslint-disable-next-line @next/next/no-img-element -- auth-protected API image */}
-              <img src="/api/company/logo" alt="โลโก้ปัจจุบัน" className="h-20 w-20 rounded border border-slate-200 object-contain" />
+              <img src={logoUrl} alt="โลโก้ปัจจุบัน" className="h-20 w-20 rounded border border-slate-200 object-contain" />
               <label className="flex items-center gap-1.5 text-sm">
                 <input type="checkbox" name="removeLogo" /> ลบโลโก้
               </label>
@@ -80,21 +90,46 @@ export function CompanyForm({ action, initial, hasLogo }: { action: (prev: Compa
       </Section>
 
       <Section title="ใบกำกับภาษี">
+        <div className="space-y-2 sm:col-span-2">
+          <span className="block text-sm font-medium text-slate-700">แบบฟอร์มที่พิมพ์</span>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ["red", "แบบแดง", "หัวแดง กล่องเลขที่/โปรเจ็ค ช่องหักส่วนลดพิเศษ หมายเหตุท้ายใบ แถบชื่อบริษัทด้านล่าง"],
+              ["classic", "แบบน้ำตาล", "หัวตารางสีน้ำตาล คอลัมน์ส่วนลดรายการ ช่องชำระเงินโดย"],
+              ["green", "แบบเขียว", "กรอบเขียว ใบสั่งซื้อ/อ้างถึง/ผู้สั่งสินค้า หักส่วนลด แถบจำนวนเงินตัวอักษร กล่องลงนามในนามบริษัท"],
+              ["mono", "แบบขาวดำ", "กรอบมุมมนสีดำ รหัสลูกค้า รหัสสาขา แถวใบสั่งซื้อ/เงื่อนไขชำระ คอลัมน์ส่วนลด"],
+            ].map(([value, label, desc]) => (
+              <label key={value} className="flex cursor-pointer gap-2 rounded-lg border border-slate-200 p-3 text-sm has-checked:border-blue-500 has-checked:bg-blue-50">
+                <input type="radio" name="invoiceTemplate" value={value} defaultChecked={(values.invoiceTemplate ?? "red") === value} className="mt-1" />
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="block text-xs text-slate-500">{desc}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          {errors.invoiceTemplate && <p className="text-sm text-red-600">{errors.invoiceTemplate}</p>}
+        </div>
+        {field("footerNotes", "หมายเหตุท้ายใบกำกับ", {
+          wide: true,
+          textarea: true,
+          hint: "บรรทัดละ 1 ข้อ จะพิมพ์เป็น 1. 2. 3. (แบบแดง) เช่น เงื่อนไขการชำระเงิน การรับสินค้า",
+        })}
         {field("vatRate", "อัตราภาษีมูลค่าเพิ่ม (%)", { required: true, hint: "ใช้กับใบที่ออกหลังจากนี้ ใบเดิมคงอัตราเดิม" })}
       </Section>
 
       <div className="flex justify-end">
         <button type="submit" disabled={pending} className={buttonPrimary}>
-          {pending ? "กำลังบันทึก…" : "บันทึก"}
+          {pending ? "กำลังบันทึก…" : submitLabel}
         </button>
       </div>
     </form>
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
   return (
-    <fieldset className={`${cardClass} p-5`}>
+    <fieldset id={id} className={`${cardClass} scroll-mt-6 p-5`}>
       <legend className="px-1 text-sm font-semibold text-slate-700">{title}</legend>
       <div className="grid gap-4 sm:grid-cols-2">{children}</div>
     </fieldset>

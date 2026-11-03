@@ -12,6 +12,8 @@ let queries: typeof import("@/server/invoices/queries");
 let company: typeof import("@/server/company/actions");
 let logoRoute: (req: NextRequest, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 let customerId: string;
+/** The first company, created in "saves, stores the logo and serves it" */
+let sellerId = 0;
 
 const PAPER_ITEMS = [
   { description: "COMFAST CF-E130N Wireless Bridge 300M 2.4GHz", quantity: "60", unit: "ตัว", unitPrice: "650.00", discount: "" },
@@ -25,6 +27,7 @@ let numberCounter = 0;
 function invoiceForm(overrides: Record<string, string> = {}, items: unknown = PAPER_ITEMS) {
   const fd = new FormData();
   const values = {
+    companyId: String(sellerId),
     number: `T-${String(++numberCounter).padStart(4, "0")}`,
     customerId,
     buyerName: "บริษัท ผู้ซื้อทดสอบ จำกัด",
@@ -34,6 +37,7 @@ function invoiceForm(overrides: Record<string, string> = {}, items: unknown = PA
     issueDate: "2026-09-17",
     dueDate: "2026-09-17",
     salesperson: "ทดสอบ",
+    projectName: "โครงการทดสอบ",
     paymentTerm: "เงินสด",
     remark: "",
     ...overrides,
@@ -60,6 +64,9 @@ function companyForm(overrides: Record<string, string> = {}, logo?: File) {
     branchType: "head",
     branchCode: "",
     headerNote: "เอกสารออกเป็นชุด",
+    lineOfficial: "@testseller",
+    footerNotes: "โปรดสั่งจ่ายเช็คขีดคร่อมในนามบริษัทเท่านั้น\nสินค้าซื้อแล้วไม่รับคืน",
+    invoiceTemplate: "red",
     vatRate: "7",
     ...overrides,
   };
@@ -69,6 +76,10 @@ function companyForm(overrides: Record<string, string> = {}, logo?: File) {
 }
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+
+function logo(id: number | string) {
+  return logoRoute(new NextRequest(`http://localhost/api/companies/${id}/logo`), { params: Promise.resolve({ id: String(id) }) });
+}
 
 async function createAs(user: { id: string }, overrides: Record<string, string> = {}) {
   h.loginAs(user);
@@ -82,7 +93,7 @@ before(async () => {
   actions = await import("@/server/invoices/actions");
   queries = await import("@/server/invoices/queries");
   company = await import("@/server/company/actions");
-  logoRoute = (await import("@/app/api/company/logo/route")).GET;
+  logoRoute = (await import("@/app/api/companies/[id]/logo/route")).GET;
   const c = await h.db.customer.create({ data: { code: "C00001", name: "ผู้ซื้อทดสอบ", createdById: users.tier3.id } });
   customerId = c.id;
 });
@@ -90,46 +101,51 @@ before(async () => {
 after(() => h.cleanup());
 
 describe("company settings", () => {
-  test("invoices can't be issued before the seller is set up", async () => {
+  test("invoices can't be issued without an existing company", async () => {
     h.loginAs(users.tier1);
-    const r = await actions.createInvoice({}, invoiceForm());
-    assert.match(r.errors?.form ?? "", /ตั้งค่าข้อมูลบริษัท/);
+    const r = await actions.createInvoice({}, invoiceForm({ companyId: "999" }));
+    assert.match(r.errors?.form ?? "", /ไม่พบบริษัท/);
     assert.equal(await h.db.invoice.count(), 0);
   });
 
   test("only admins can change them", async () => {
     for (const u of [users.tier1, users.tier2, users.tier3]) {
       h.loginAs(u);
-      await assert.rejects(company.saveCompany({}, companyForm()), ForbiddenError);
+      await assert.rejects(company.saveCompany(null, {}, companyForm()), ForbiddenError);
+      await assert.rejects(company.deleteCompany(1), ForbiddenError);
     }
-    assert.equal(await h.db.companySettings.count(), 0);
+    assert.equal(await h.db.company.count(), 0);
   });
 
   test("validates tax ID, VAT rate and logo type", async () => {
     h.loginAs(users.admin);
-    const r = await company.saveCompany({}, companyForm({ taxId: "1234567890123", vatRate: "abc" }, new File(["not an image"], "logo.png")));
+    const r = await company.saveCompany(null, {}, companyForm({ taxId: "1234567890123", vatRate: "abc" }, new File(["not an image"], "logo.png")));
     assert.ok(r.errors?.taxId);
     assert.ok(r.errors?.vatRate);
+    const t = await company.saveCompany(null, {}, companyForm({ invoiceTemplate: "fancy" }));
+    assert.ok(t.errors?.invoiceTemplate);
     assert.match(r.errors?.logo ?? "", /PNG, JPG หรือ WebP/);
-    assert.equal(await h.db.companySettings.count(), 0);
+    assert.equal(await h.db.company.count(), 0);
   });
 
   test("saves, stores the logo and serves it", async () => {
     h.loginAs(users.admin);
-    const r = await company.saveCompany({}, companyForm({}, new File([PNG], "logo.png")));
-    assert.deepEqual(r, { saved: true });
-    const row = await h.db.companySettings.findUniqueOrThrow({ where: { id: 1 } });
+    const url = await expectRedirect(company.saveCompany(null, {}, companyForm({}, new File([PNG], "logo.png"))));
+    sellerId = Number(url.match(/^\/settings\/company\/(\d+)\?created=1$/)?.[1]);
+    const row = await h.db.company.findUniqueOrThrow({ where: { id: sellerId } });
     assert.equal(row.taxId, "0105536009604");
     assert.equal(row.logoMime, "image/png");
+    assert.deepEqual(await company.saveCompany(sellerId, {}, companyForm()), { saved: true }, "updating returns saved");
 
     h.loginAs(users.tier1);
-    const res = await logoRoute(new NextRequest("http://localhost/api/company/logo"), { params: Promise.resolve({}) });
+    const res = await logo(sellerId);
     assert.equal(res.status, 200);
     assert.equal(res.headers.get("content-type"), "image/png");
     assert.deepEqual(new Uint8Array(await res.arrayBuffer()), PNG);
+    assert.equal((await logo("abc")).status, 404);
 
     h.loginAs(null);
-    assert.equal((await logoRoute(new NextRequest("http://localhost/api/company/logo"), { params: Promise.resolve({}) })).status, 401);
+    assert.equal((await logo(sellerId)).status, 401);
   });
 });
 
@@ -148,6 +164,10 @@ describe("issuing", () => {
     assert.deepEqual(inv.items.map((i) => i.amount), ["39000.00", "42084.00", "29976.00"]);
     assert.equal(inv.buyerTaxId, "0105536009604");
     assert.equal(inv.seller.nameTh, "บริษัท ผู้ขายทดสอบ จำกัด");
+    assert.equal(inv.seller.lineOfficial, "@testseller");
+    assert.equal(inv.seller.footerNotes, "โปรดสั่งจ่ายเช็คขีดคร่อมในนามบริษัทเท่านั้น\nสินค้าซื้อแล้วไม่รับคืน");
+    assert.ok(!("invoiceTemplate" in inv.seller), "the layout choice is not frozen into the invoice");
+    assert.equal(inv.projectName, "โครงการทดสอบ");
     assert.equal(inv.status, "ISSUED");
   });
 
@@ -195,7 +215,7 @@ describe("issuing", () => {
   test("issued invoices keep the buyer and seller as they were", async () => {
     await h.db.customer.update({ where: { id: customerId }, data: { name: "ชื่อใหม่" } });
     h.loginAs(users.admin);
-    await company.saveCompany({}, companyForm({ nameTh: "บริษัท เปลี่ยนชื่อ จำกัด", vatRate: "10" }));
+    await company.saveCompany(sellerId, {}, companyForm({ nameTh: "บริษัท เปลี่ยนชื่อ จำกัด", vatRate: "10" }));
     const inv = await queries.getInvoice(users.admin, firstId);
     assert.equal(inv?.buyerName, "บริษัท ผู้ซื้อทดสอบ จำกัด");
     assert.equal(inv?.seller.nameTh, "บริษัท ผู้ขายทดสอบ จำกัด");
@@ -268,5 +288,70 @@ describe("editing and cancelling: admins only", () => {
     // Its number can't be given to a new invoice
     const reuse = await actions.createInvoice({}, invoiceForm({ number: "IN0926-0071" }));
     assert.match(reuse.errors?.number ?? "", /ยกเลิกแล้ว/);
+  });
+});
+
+describe("several companies", () => {
+  let otherId: number;
+  before(async () => {
+    h.loginAs(users.admin);
+    const url = await expectRedirect(
+      company.saveCompany(null, {}, companyForm({ nameTh: "บริษัท ที่สอง จำกัด", taxId: "0105536009604", invoiceTemplate: "green", vatRate: "7" })),
+    );
+    otherId = Number(url.split("/").pop()!.split("?")[0]);
+  });
+
+  test("each company has its own numbers: the same number is fine across companies, not within one", async () => {
+    h.loginAs(users.tier2);
+    const a = await createAs(users.tier2, { companyId: String(sellerId), number: "SHARED-1" });
+    const b = await createAs(users.tier2, { companyId: String(otherId), number: "SHARED-1" });
+    const again = await actions.createInvoice({}, invoiceForm({ companyId: String(otherId), number: "SHARED-1" }));
+    assert.match(again.errors?.number ?? "", /มีอยู่แล้ว/);
+
+    const [ia, ib] = await Promise.all([queries.getInvoice(users.tier2, a), queries.getInvoice(users.tier2, b)]);
+    assert.equal(ia?.companyId, sellerId);
+    assert.equal(ib?.companyId, otherId);
+    assert.equal(ib?.seller.nameTh, "บริษัท ที่สอง จำกัด");
+    assert.ok(!("id" in (ib?.seller ?? {})), "the company id is a column, not part of the snapshot");
+  });
+
+  test("the list can be filtered per company, and the last-number hint is per company", async () => {
+    const list = await queries.listInvoices(users.tier2, { companyId: otherId });
+    assert.ok(list.invoices.length > 0);
+    assert.ok(list.invoices.every((i) => i.company.id === otherId));
+    await createAs(users.tier2, { companyId: String(otherId), number: "OTHER-LAST" });
+    assert.equal(await queries.lastInvoiceNumber(otherId), "OTHER-LAST");
+    assert.notEqual(await queries.lastInvoiceNumber(sellerId), "OTHER-LAST");
+  });
+
+  test("an incomplete company can't issue invoices", async () => {
+    const draft = await h.db.company.create({ data: { nameTh: "ยังไม่ครบ" } });
+    h.loginAs(users.tier2);
+    const r = await actions.createInvoice({}, invoiceForm({ companyId: String(draft.id) }));
+    assert.match(r.errors?.form ?? "", /ยังไม่ครบ/);
+    await h.db.company.delete({ where: { id: draft.id } });
+  });
+
+  test("editing can't move an invoice to another company", async () => {
+    const id = await createAs(users.tier2, { companyId: String(otherId) });
+    h.loginAs(users.admin);
+    await expectRedirect(actions.updateInvoice(id, {}, invoiceForm({ companyId: String(sellerId), remark: "แก้ไข" })));
+    const row = await h.db.invoice.findUniqueOrThrow({ where: { id } });
+    assert.equal(row.companyId, otherId);
+    assert.equal(row.remark, "แก้ไข");
+  });
+
+  test("a company that issued invoices can't be deleted; an unused one can", async () => {
+    h.loginAs(users.admin);
+    const r = await company.deleteCompany(otherId);
+    assert.match(r.error, /ออกใบกำกับไปแล้ว/);
+    assert.ok(await h.db.company.findUnique({ where: { id: otherId } }));
+
+    const url = await expectRedirect(company.saveCompany(null, {}, companyForm({ nameTh: "บริษัท ทดลองลบ จำกัด" }, new File([PNG], "logo.png"))));
+    const unusedId = Number(url.split("/").pop()!.split("?")[0]);
+    assert.equal(await expectRedirect(company.deleteCompany(unusedId)), "/settings/company");
+    assert.equal(await h.db.company.findUnique({ where: { id: unusedId } }), null);
+    h.loginAs(users.tier1);
+    assert.equal((await logo(unusedId)).status, 404, "its logo is gone too");
   });
 });

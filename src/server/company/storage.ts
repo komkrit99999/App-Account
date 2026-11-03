@@ -2,9 +2,14 @@ import "server-only";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-// Company logo for tax invoices. Back this folder up with the DB.
+// Company logos for tax invoices, one folder per company id. Back this folder up with the DB.
 const DIR = process.env.COMPANY_STORAGE_DIR ?? path.join(/*turbopackIgnore: true*/ process.cwd(), "storage", "company");
-const LOGO = () => path.join(/*turbopackIgnore: true*/ DIR, "logo");
+
+// Ids are database integers; refuse anything else so a crafted id can't escape DIR
+const logoPath = (companyId: number) => {
+  if (!Number.isInteger(companyId) || companyId <= 0) throw new Error("invalid company id");
+  return path.join(/*turbopackIgnore: true*/ DIR, String(companyId), "logo");
+};
 
 export const LOGO_MAX_BYTES = 1024 * 1024;
 
@@ -16,19 +21,20 @@ export function sniffImage(buf: Buffer): "image/png" | "image/jpeg" | "image/web
   return null;
 }
 
-export async function saveLogo(data: Buffer): Promise<void> {
-  await mkdir(/*turbopackIgnore: true*/ DIR, { recursive: true });
-  await writeFile(/*turbopackIgnore: true*/ LOGO(), data);
+export async function saveLogo(companyId: number, data: Buffer): Promise<void> {
+  const file = logoPath(companyId);
+  await mkdir(/*turbopackIgnore: true*/ path.dirname(file), { recursive: true });
+  await writeFile(/*turbopackIgnore: true*/ file, data);
 }
 
-export async function readLogo(): Promise<Buffer | null> {
+export async function readLogo(companyId: number): Promise<Buffer | null> {
   try {
-    return await readFile(/*turbopackIgnore: true*/ LOGO());
+    return await readFile(/*turbopackIgnore: true*/ logoPath(companyId));
   } catch {
     return null;
   }
 }
 
-export async function deleteLogo(): Promise<void> {
-  await rm(/*turbopackIgnore: true*/ LOGO(), { force: true });
+export async function deleteLogo(companyId: number): Promise<void> {
+  await rm(/*turbopackIgnore: true*/ path.dirname(logoPath(companyId)), { recursive: true, force: true });
 }

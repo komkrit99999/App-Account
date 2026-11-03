@@ -38,6 +38,7 @@ export async function setupIntegration() {
   const dir = mkdtempSync(path.join(tmpdir(), "app-account-test-"));
   process.env.DATABASE_URL = `file:${path.join(dir, "test.db")}`;
   process.env.IMPORT_STORAGE_DIR = path.join(dir, "imports");
+  process.env.COMPANY_STORAGE_DIR = path.join(dir, "company");
 
   // Same migrations as production, applied to the throwaway DB
   execFileSync("npx", ["prisma", "migrate", "deploy"], { env: process.env, stdio: "pipe" });

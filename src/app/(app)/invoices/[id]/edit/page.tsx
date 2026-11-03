@@ -13,19 +13,21 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
   const user = await requireFeature("editInvoice");
   if (!can(user, "viewFinancial")) forbidden();
   const { id } = await params;
-  const [invoice, buyers, lastNumber] = await Promise.all([getInvoice(user, id), listBuyerOptions(), lastInvoiceNumber(id)]);
+  const [invoice, buyers] = await Promise.all([getInvoice(user, id), listBuyerOptions()]);
   if (!invoice || invoice.status === "CANCELLED") notFound();
+  const lastNumber = await lastInvoiceNumber(invoice.companyId, invoice.id);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
       <h1 className="text-2xl font-semibold">
         แก้ไขใบกำกับภาษี <span className="text-slate-400">{invoice.number}</span>
       </h1>
-      <p className="text-sm text-slate-500">อัตรา VAT และข้อมูลผู้ขายคงเดิมตามวันที่ออก</p>
+      <p className="text-sm text-slate-500">ในนาม {invoice.seller.nameTh} · บริษัท อัตรา VAT และข้อมูลผู้ขายคงเดิมตามวันที่ออก</p>
       <InvoiceForm
         action={updateInvoice.bind(null, invoice.id)}
         initial={{
           fields: {
+            companyId: String(invoice.companyId),
             number: invoice.number,
             customerId: invoice.customerId,
             buyerName: invoice.buyerName,
@@ -35,6 +37,10 @@ export default async function EditInvoicePage({ params }: PageProps<"/invoices/[
             issueDate: toDateInput(invoice.issueDate),
             dueDate: toDateInput(invoice.dueDate),
             salesperson: invoice.salesperson ?? "",
+            projectName: invoice.projectName ?? "",
+            purchaseOrderNo: invoice.purchaseOrderNo ?? "",
+            reference: invoice.reference ?? "",
+            orderedBy: invoice.orderedBy ?? "",
             paymentTerm: invoice.paymentTerm ?? "",
             remark: invoice.remark ?? "",
           },

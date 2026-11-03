@@ -13,17 +13,20 @@ import { invoiceFormValues, parseInvoiceForm, type InvoiceFieldErrors, type Invo
 
 export type InvoiceFormState = { errors?: InvoiceFieldErrors; values?: InvoiceFormValues };
 
-/** Error for a number already used by another invoice (cancelled ones included — numbers are never reused) */
-async function numberTaken(number: string, exceptId?: string) {
-  const other = await db.invoice.findUnique({ where: { number }, select: { id: true, status: true } });
+/**
+ * Error for a number this company already used on another invoice (cancelled
+ * ones included — numbers are never reused). Different companies may share numbers.
+ */
+async function numberTaken(companyId: number, number: string, exceptId?: string) {
+  const other = await db.invoice.findUnique({ where: { companyId_number: { companyId, number } }, select: { id: true, status: true } });
   if (!other || other.id === exceptId) return null;
   return other.status === "CANCELLED" ? "เลขที่นี้เคยใช้กับใบที่ยกเลิกแล้ว ใช้ซ้ำไม่ได้" : "เลขที่นี้มีอยู่แล้ว";
 }
 
-async function validate(formData: FormData, vatRate: string, exceptId?: string) {
+async function validate(formData: FormData, companyId: number, vatRate: string, exceptId?: string) {
   const parsed = parseInvoiceForm(formData);
   if (!parsed.ok) return parsed;
-  const taken = await numberTaken(parsed.data.number, exceptId);
+  const taken = await numberTaken(companyId, parsed.data.number, exceptId);
   if (taken) return { ok: false as const, errors: { number: taken } };
   const customer = await db.customer.findFirst({ where: { id: parsed.data.customerId, deletedAt: null }, select: { id: true } });
   if (!customer) return { ok: false as const, errors: { customerId: "ไม่พบลูกค้ารายนี้ หรือถูกลบไปแล้ว" } };
@@ -45,22 +48,27 @@ function itemRows(data: InvoiceInput, amounts: string[]) {
   }));
 }
 
-function headerData({ items, ...data }: InvoiceInput) {
+/** Header columns from the form; the company is never taken from here (fixed per invoice) */
+function headerData({ items, companyId, ...data }: InvoiceInput) {
   void items;
+  void companyId;
   return data;
 }
 
 export async function createInvoice(_prev: InvoiceFormState, formData: FormData): Promise<InvoiceFormState> {
   const user = await requireFeature("createInvoice");
-  const company = await getCompany();
-  if (!isCompanyReady(company)) return { errors: { form: "ยังไม่ได้ตั้งค่าข้อมูลบริษัท (ชื่อ ที่อยู่ เลขผู้เสียภาษี) — ติดต่อ admin" }, values: invoiceFormValues(formData) };
+  const company = await getCompany(Number(formData.get("companyId")));
+  if (!company) return { errors: { form: "ไม่พบบริษัทผู้ออกใบกำกับ" }, values: invoiceFormValues(formData) };
+  if (!isCompanyReady(company)) return { errors: { form: "ข้อมูลบริษัทนี้ยังไม่ครบ (ชื่อ ที่อยู่ เลขผู้เสียภาษี) — ติดต่อ admin" }, values: invoiceFormValues(formData) };
 
-  const result = await validate(formData, company.vatRate);
+  const result = await validate(formData, company.id, company.vatRate);
   if (!result.ok) return { errors: result.errors, values: invoiceFormValues(formData) };
   const { data, totals } = result;
 
-  const { vatRate, hasLogo, ...seller } = company;
+  // The layout choice is presentation, not part of the issued document
+  const { id: companyId, vatRate, hasLogo, invoiceTemplate, ...seller } = company;
   void hasLogo;
+  void invoiceTemplate;
   const sellerSnapshot: SellerSnapshot = seller;
 
   // seq (internal order) is taken inside the transaction; a simultaneous submit
@@ -76,6 +84,7 @@ export async function createInvoice(_prev: InvoiceFormState, formData: FormData)
           data: {
             ...headerData(data),
             seq: (last._max.seq ?? 0) + 1,
+            companyId,
             seller: JSON.stringify(sellerSnapshot),
             subtotal: totals.subtotal,
             vatRate,
@@ -90,7 +99,7 @@ export async function createInvoice(_prev: InvoiceFormState, formData: FormData)
       });
     } catch (e) {
       if (!(e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002")) throw e;
-      const taken = await numberTaken(data.number);
+      const taken = await numberTaken(companyId, data.number);
       if (taken) return { errors: { number: taken }, values: invoiceFormValues(formData) };
     }
   }
@@ -109,12 +118,12 @@ async function requireInvoiceEditor() {
 
 export async function updateInvoice(id: string, _prev: InvoiceFormState, formData: FormData): Promise<InvoiceFormState> {
   const user = await requireInvoiceEditor();
-  const existing = await db.invoice.findUnique({ where: { id }, select: { status: true, vatRate: true } });
+  const existing = await db.invoice.findUnique({ where: { id }, select: { status: true, vatRate: true, companyId: true } });
   if (!existing) return { errors: { form: "ไม่พบใบกำกับภาษีนี้" } };
   if (existing.status === "CANCELLED") return { errors: { form: "ใบกำกับภาษีนี้ถูกยกเลิกแล้ว แก้ไขไม่ได้" } };
 
   // Keeps the VAT rate and seller it was issued with; the number may change but not to one in use
-  const result = await validate(formData, existing.vatRate.toString(), id);
+  const result = await validate(formData, existing.companyId, existing.vatRate.toString(), id);
   if (!result.ok) return { errors: result.errors, values: invoiceFormValues(formData) };
   const { data, totals } = result;
 

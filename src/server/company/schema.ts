@@ -2,6 +2,8 @@ import { z } from "zod";
 import { isValidThaiTaxId, normalizeTaxId } from "@/lib/thai-tax-id";
 import { toHundredths } from "@/lib/invoice";
 
+export const INVOICE_TEMPLATES = ["red", "classic", "green", "mono"] as const;
+
 const text = (max: number) =>
   z
     .string()
@@ -18,6 +20,7 @@ export const companySchema = z
     phone: text(100),
     email: text(200),
     lineId: text(100),
+    lineOfficial: text(100),
     facebook: text(200),
     taxId: z
       .string()
@@ -29,6 +32,8 @@ export const companySchema = z
     branchType: z.enum(["head", "branch"]),
     branchCode: z.string().trim(),
     headerNote: text(100),
+    footerNotes: text(1000),
+    invoiceTemplate: z.enum(INVOICE_TEMPLATES, "เลือกแบบฟอร์ม"),
     vatRate: z
       .string()
       .trim()
@@ -48,6 +53,8 @@ export const companySchema = z
     branchCode: branchType === "head" ? "00000" : branchCode,
   }));
 
+export type InvoiceTemplate = (typeof INVOICE_TEMPLATES)[number];
+
 export type CompanyInput = z.output<typeof companySchema>;
 
-export const COMPANY_FIELDS = ["nameTh", "nameEn", "addressTh", "addressEn", "phone", "email", "lineId", "facebook", "taxId", "branchType", "branchCode", "headerNote", "vatRate"] as const;
+export const COMPANY_FIELDS = ["nameTh", "nameEn", "addressTh", "addressEn", "phone", "email", "lineId", "lineOfficial", "facebook", "taxId", "branchType", "branchCode", "headerNote", "footerNotes", "invoiceTemplate", "vatRate"] as const;

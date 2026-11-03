@@ -185,39 +185,50 @@ model Loan {
   @@index([customerId])
 }
 
-// The seller shown on tax invoices. Single row (id = 1), edited by admins.
-model CompanySettings {
-  id           Int      @id @default(1)
-  nameTh       String   @default("")
-  nameEn       String?
-  addressTh    String?
-  addressEn    String?
-  phone        String?
-  email        String?
-  lineId       String?
-  facebook     String?
-  taxId        String?
-  isHeadOffice Boolean  @default(true)
-  branchCode   String? // 5 digits when not head office
-  headerNote   String? // small line under the tax ID, e.g. "เอกสารออกเป็นชุด"
-  vatRate      Decimal  @default(7) // percent
-  logoMime     String? // set when a logo is stored in storage/company/logo
-  updatedAt    DateTime @updatedAt
+// A seller that issues tax invoices. There can be several; each has its own
+// details, logo, layout and VAT rate. Edited by admins.
+model Company {
+  id              Int      @id @default(autoincrement())
+  nameTh          String   @default("")
+  nameEn          String?
+  addressTh       String?
+  addressEn       String?
+  phone           String?
+  email           String?
+  lineId          String?
+  lineOfficial    String?
+  facebook        String?
+  taxId           String?
+  isHeadOffice    Boolean  @default(true)
+  branchCode      String? // 5 digits when not head office
+  headerNote      String? // small line under the tax ID, e.g. "เอกสารออกเป็นชุด"
+  footerNotes     String? // terms printed as a numbered list at the bottom, one per line
+  invoiceTemplate String   @default("red") // "red" | "classic" | "green" | "mono": layout of the printed invoice
+  vatRate         Decimal  @default(7) // percent
+  logoMime        String? // set when a logo is stored in storage/company/logo
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  invoices Invoice[]
 }
 
 // Tax invoice (ใบกำกับภาษี). Never deleted — cancelled instead, so numbers stay continuous.
 // Buyer and seller details are copied in at issue time so later edits to the
 // customer or company don't change an issued document.
 model Invoice {
-  id          String        @id @default(cuid())
-  seq         Int           @unique // order of issue (internal)
-  number      String        @unique // typed in by the user, e.g. IN1026-0001; editable, never repeated
-  status      InvoiceStatus @default(ISSUED)
-  issueDate   DateTime // date only (UTC midnight)
-  dueDate     DateTime?
-  salesperson String?
-  paymentTerm String?
-  remark      String?
+  id              String        @id @default(cuid())
+  seq             Int           @unique // order of issue (internal)
+  number          String // typed in by the user, e.g. IN1026-0001; editable, never repeated (unique per company)
+  status          InvoiceStatus @default(ISSUED)
+  issueDate       DateTime // date only (UTC midnight)
+  dueDate         DateTime?
+  salesperson     String?
+  projectName     String?
+  purchaseOrderNo String? // เลขที่ใบสั่งซื้อ
+  reference       String? // อ้างถึง
+  orderedBy       String? // ผู้สั่งสินค้า
+  paymentTerm     String?
+  remark          String?
 
   customerId   String
   customer     Customer @relation(fields: [customerId], references: [id])
@@ -226,7 +237,9 @@ model Invoice {
   buyerAddress String?
   buyerTaxId   String?
 
-  seller String // JSON snapshot of CompanySettings
+  companyId Int
+  company   Company @relation(fields: [companyId], references: [id])
+  seller    String // JSON snapshot of the company
 
   subtotal  Decimal
   vatRate   Decimal
@@ -243,6 +256,7 @@ model Invoice {
   updatedAt   DateTime  @updatedAt
   cancelledAt DateTime?
 
+  @@unique([companyId, number])
   @@index([issueDate])
   @@index([customerId])
   @@index([createdById, issueDate])

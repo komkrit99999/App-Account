@@ -15,17 +15,18 @@ function visibility(user: Viewer): Prisma.InvoiceWhereInput | null {
   return null;
 }
 
-export type SellerSnapshot = Omit<CompanyDTO, "vatRate" | "hasLogo">;
+export type SellerSnapshot = Omit<CompanyDTO, "id" | "vatRate" | "hasLogo" | "invoiceTemplate">;
 
 export const INVOICE_PAGE_SIZE = 30;
 
-export async function listInvoices(user: Viewer, filter: { q?: string; page?: number }) {
+export async function listInvoices(user: Viewer, filter: { q?: string; page?: number; companyId?: number }) {
   const visible = visibility(user);
   const page = Math.max(1, filter.page ?? 1);
   if (!visible) return { invoices: [], total: 0, page, pageCount: 1 };
   const q = filter.q?.trim();
   const where: Prisma.InvoiceWhereInput = {
     ...visible,
+    ...(filter.companyId && { companyId: filter.companyId }),
     ...(q && { OR: [{ number: { contains: q } }, { buyerName: { contains: q } }, { buyerTaxId: { contains: q.replace(/\D/g, "") || q } }] }),
   };
   const [rows, total] = await Promise.all([
@@ -42,6 +43,7 @@ export async function listInvoices(user: Viewer, filter: { q?: string; page?: nu
         buyerName: true,
         total: true,
         customerId: true,
+        company: { select: { id: true, nameTh: true } },
         createdBy: { select: { displayName: true } },
       },
     }),
@@ -62,7 +64,7 @@ export async function listInvoicesForCustomer(user: Viewer, customerId: string) 
     where: { ...visible, customerId },
     orderBy: { seq: "desc" },
     take: 10,
-    select: { id: true, number: true, status: true, issueDate: true, total: true },
+    select: { id: true, number: true, status: true, issueDate: true, total: true, company: { select: { nameTh: true } } },
   });
   return rows.map((r) => ({ ...r, total: r.total.toFixed(2) }));
 }
@@ -74,14 +76,16 @@ export async function getInvoice(user: Viewer, id: string) {
     where: { ...visible, id },
     include: {
       items: { orderBy: { position: "asc" } },
+      customer: { select: { code: true } },
       createdBy: { select: { displayName: true } },
       updatedBy: { select: { displayName: true } },
     },
   });
   if (!row) return null;
-  const { seller, subtotal, vatRate, vatAmount, total, items, createdBy, updatedBy, ...rest } = row;
+  const { seller, subtotal, vatRate, vatAmount, total, items, createdBy, updatedBy, customer, ...rest } = row;
   return {
     ...rest,
+    customerCode: customer.code,
     seller: JSON.parse(seller) as SellerSnapshot,
     subtotal: subtotal.toFixed(2),
     vatRate: String(Number(vatRate)),
@@ -101,10 +105,10 @@ export async function getInvoice(user: Viewer, id: string) {
   };
 }
 
-/** The most recently issued number, shown as a hint when typing the next one */
-export async function lastInvoiceNumber(exceptId?: string): Promise<string | null> {
+/** The company's most recently issued number, shown as a hint when typing the next one */
+export async function lastInvoiceNumber(companyId: number, exceptId?: string): Promise<string | null> {
   const row = await db.invoice.findFirst({
-    where: exceptId ? { id: { not: exceptId } } : {},
+    where: { companyId, ...(exceptId && { id: { not: exceptId } }) },
     orderBy: { seq: "desc" },
     select: { number: true },
   });

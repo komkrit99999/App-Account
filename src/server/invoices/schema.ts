@@ -42,6 +42,7 @@ const itemSchema = z.object({
 
 export const invoiceSchema = z
   .object({
+    companyId: z.coerce.number().int().positive("เลือกบริษัทผู้ออกใบกำกับ"),
     number: z.string().trim().min(1, "กรอกเลขที่ใบกำกับ").max(40, "ยาวเกิน 40 ตัวอักษร"),
     customerId: z.string().min(1, "เลือกลูกค้า"),
     buyerName: z.string().trim().min(1, "กรอกชื่อลูกค้า").max(200, "ยาวเกิน 200 ตัวอักษร"),
@@ -59,6 +60,10 @@ export const invoiceSchema = z
     issueDate: dateOnly.refine((v) => v !== null, "ระบุวันที่"),
     dueDate: dateOnly,
     salesperson: text(100),
+    projectName: text(200),
+    purchaseOrderNo: text(50),
+    reference: text(100),
+    orderedBy: text(100),
     paymentTerm: text(100),
     remark: text(1000),
     items: z.array(itemSchema).min(1, "ต้องมีอย่างน้อย 1 รายการ").max(MAX_ITEMS, `ไม่เกิน ${MAX_ITEMS} รายการ`),
@@ -85,7 +90,7 @@ export type InvoiceFormValues = {
   items: { description: string; quantity: string; unit: string; unitPrice: string; discount: string }[];
 };
 
-const HEADER_FIELDS = ["number", "customerId", "buyerName", "buyerBranch", "buyerAddress", "buyerTaxId", "issueDate", "dueDate", "salesperson", "paymentTerm", "remark"] as const;
+const HEADER_FIELDS = ["companyId", "number", "customerId", "buyerName", "buyerBranch", "buyerAddress", "buyerTaxId", "issueDate", "dueDate", "salesperson", "projectName", "purchaseOrderNo", "reference", "orderedBy", "paymentTerm", "remark"] as const;
 
 export function invoiceFormValues(formData: FormData): InvoiceFormValues {
   let items: InvoiceFormValues["items"] = [];

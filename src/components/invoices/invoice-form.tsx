@@ -126,6 +126,7 @@ function InvoiceFormBody({
   return (
     <form action={formAction} className="space-y-6" noValidate>
       {/* Only non-blank rows are sent, so server error indexes line up with `filled` */}
+      <input type="hidden" name="companyId" value={fields.companyId ?? ""} />
       <input type="hidden" name="items" value={JSON.stringify(filled.map(({ key, ...r }) => (void key, r)))} />
       {errors.form && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errors.form}</p>}
 
@@ -179,6 +180,18 @@ function InvoiceFormBody({
           </Field>
           <Field label="พนักงานขาย" htmlFor="salesperson" error={errors.salesperson}>
             {input("salesperson")}
+          </Field>
+          <Field label="ชื่อโปรเจ็ค" htmlFor="projectName" error={errors.projectName}>
+            {input("projectName")}
+          </Field>
+          <Field label="เลขที่ใบสั่งซื้อ" htmlFor="purchaseOrderNo" error={errors.purchaseOrderNo}>
+            {input("purchaseOrderNo")}
+          </Field>
+          <Field label="อ้างถึง" htmlFor="reference" error={errors.reference}>
+            {input("reference")}
+          </Field>
+          <Field label="ผู้สั่งสินค้า" htmlFor="orderedBy" error={errors.orderedBy}>
+            {input("orderedBy")}
           </Field>
           <Field label="กำหนดชำระเงิน" htmlFor="paymentTerm" error={errors.paymentTerm}>
             {input("paymentTerm", { placeholder: "เงินสด / เครดิต 30 วัน" })}

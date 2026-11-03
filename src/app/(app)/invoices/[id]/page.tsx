@@ -4,8 +4,11 @@ import { requireFeature } from "@/lib/authz";
 import { can } from "@/lib/permissions";
 import { formatDateTime } from "@/lib/format";
 import { getInvoice } from "@/server/invoices/queries";
-import { getCompany } from "@/server/company/queries";
+import { getCompany, logoUrl } from "@/server/company/queries";
 import { InvoiceDocument } from "@/components/invoices/invoice-document";
+import { InvoiceDocumentRed } from "@/components/invoices/invoice-document-red";
+import { InvoiceDocumentGreen } from "@/components/invoices/invoice-document-green";
+import { InvoiceDocumentMono } from "@/components/invoices/invoice-document-mono";
 import { CancelInvoiceButton, PrintButton } from "@/components/invoices/invoice-actions";
 import { buttonPrimary, buttonSecondary } from "@/components/ui";
 
@@ -13,8 +16,12 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const user = await requireFeature("createInvoice");
   const { id } = await params;
   const copy = (await searchParams).copy === "1";
-  const [invoice, company] = await Promise.all([getInvoice(user, id), getCompany()]);
+  const invoice = await getInvoice(user, id);
   if (!invoice) notFound();
+  // Layout and logo follow the issuing company's current settings
+  const company = await getCompany(invoice.companyId);
+  const logo = company ? logoUrl(company) : null;
+  const template = company?.invoiceTemplate ?? "red";
   const canEdit = can(user, "editInvoice") && can(user, "viewFinancial") && invoice.status === "ISSUED";
 
   return (
@@ -51,7 +58,19 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         </div>
       </div>
 
-      <InvoiceDocument invoice={invoice} copy={copy} hasLogo={company.hasLogo} />
+      {company && !logo && can(user, "manageCompany") && (
+        <p className="mx-auto max-w-[210mm] rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-900 print:hidden">
+          ใบกำกับยังไม่มีโลโก้ ·{" "}
+          <Link href={`/settings/company/${company.id}#logo`} className="font-medium text-blue-700 hover:underline">
+            เพิ่มโลโก้ที่ตั้งค่าบริษัท →
+          </Link>
+        </p>
+      )}
+
+      {template === "classic" && <InvoiceDocument invoice={invoice} copy={copy} logoUrl={logo} />}
+      {template === "red" && <InvoiceDocumentRed invoice={invoice} copy={copy} logoUrl={logo} />}
+      {template === "green" && <InvoiceDocumentGreen invoice={invoice} copy={copy} logoUrl={logo} />}
+      {template === "mono" && <InvoiceDocumentMono invoice={invoice} copy={copy} logoUrl={logo} />}
 
       <p className="text-center text-xs text-slate-500 print:hidden">
         ออกโดย {invoice.createdBy} เมื่อ {formatDateTime(invoice.createdAt)}

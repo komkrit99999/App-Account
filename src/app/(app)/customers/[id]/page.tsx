@@ -114,7 +114,9 @@ async function CustomerInvoices({ user, customerId }: { user: Awaited<ReturnType
             <Link href={`/invoices/${inv.id}`} className="font-medium text-blue-700 hover:underline">
               {inv.number}
             </Link>
-            <span className="text-slate-500">{formatDate(inv.issueDate)}</span>
+            <span className="truncate text-slate-500">
+              {inv.company.nameTh} · {formatDate(inv.issueDate)}
+            </span>
             <span className={`tabular-nums ${inv.status === "CANCELLED" ? "line-through" : ""}`}>{formatMoney(inv.total)} บาท</span>
           </li>
         ))}

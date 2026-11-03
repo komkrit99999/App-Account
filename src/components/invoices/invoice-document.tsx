@@ -11,7 +11,7 @@ const BROWN = "bg-[#7a2e1f] text-white";
 const PEACH = "bg-[#f4dccf]";
 const MIN_ROWS = 12;
 
-export function InvoiceDocument({ invoice, copy, hasLogo }: { invoice: InvoiceDTO; copy: boolean; hasLogo: boolean }) {
+export function InvoiceDocument({ invoice, copy, logoUrl }: { invoice: InvoiceDTO; copy: boolean; logoUrl: string | null }) {
   const s = invoice.seller;
   const fillerRows = Math.max(0, MIN_ROWS - invoice.items.length);
   const contacts = [
@@ -31,9 +31,9 @@ export function InvoiceDocument({ invoice, copy, hasLogo }: { invoice: InvoiceDT
 
       {/* Seller */}
       <header className="flex gap-4">
-        {hasLogo && (
+        {logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- auth-protected API image, no optimisation wanted
-          <img src="/api/company/logo" alt="" className="h-24 w-24 shrink-0 object-contain" />
+          <img src={logoUrl} alt="" className="h-24 w-24 shrink-0 object-contain" />
         )}
         <div className="flex-1">
           <p className="text-lg font-bold text-[#7a2e1f]">
